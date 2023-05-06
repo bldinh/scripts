@@ -9,6 +9,7 @@ Credit to [Minhui Chen](https://github.com/Minhui-Chen) whose previous work this
   - Expect target VCF to be QC'd prior to running
   - Breaks up target vcf into overlapping 25 Mb chunks (default)
   - After imputation on each chunk, stitches results into one final file
+
 Argument | description
 `--tar` | Prefix for data to be imputed (in PLINK format).
 `--ref` | Phased vcf of reference panel.
@@ -22,9 +23,11 @@ Argument | description
 `--chunksize` | Chunk size to break chromosome into in bp (default: 25000000).
 `--overlap` | Overlap size of chunks in bp (default: 5000000).
 `--multicore` | Number of cores to use for phasing/imputation (default: 5). Suggest a fact of the number of `--workers`.
+
 - **phasing_in_chunks.py**
   - Phase a target chromosome in overlapping 25 Mb chunks (default)
   - If a reference vcf is provided, will phase chunks against the reference
   - After phasing on each chunk, stitches results into one final file
+
 - **create_m3vcf_for_ref.slurm**
   - Creates m3vcf and bim from a phased vcf
