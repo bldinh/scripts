@@ -27,7 +27,7 @@ parser.add_argument('--tar', required=True, help='prefix for plink format target
 parser.add_argument('--ref', required=True, help='phased reference data')
 parser.add_argument('--refm3', required=True, help='m3vcf')
 parser.add_argument('--refbim', required=True, help='bim')
-parser.add_argument('--chrom', required=True, help='format the same way as the target vcf, e.g. "chr22" or "22" depending on format')
+parser.add_argument('--chrom', required=True, help='format the same way as hg38 (e.g. "chr22")')
 parser.add_argument('--outdir', required=True, help='without trailing /')
 parser.add_argument('--workers', required=True, help='number of chunks to work on at same time')
 parser.add_argument('--mem', required=True, help='mem in gb to use')

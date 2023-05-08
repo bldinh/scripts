@@ -1,5 +1,5 @@
 ### Scripts
-These scripts are for for the imputation of a target dataset against a reference dataset. Imputation (with Minimac4) is performed in chunks in parallel before merging together. Additional scripts include a phasing script (using Eagle) and a shell script to convert the reference data to expected formats for the imputation script (using bcftools and Minimac3).
+These scripts are for the imputation of a target dataset against a reference dataset. Imputation (with Minimac4) is performed in chunks in parallel before merging together. Additional scripts include a phasing script (using Eagle) and a shell script to convert the reference data to expected formats for the imputation script (using bcftools and Minimac3).
 
 Credit to [Minhui Chen](https://github.com/Minhui-Chen) whose previous work this is based on/extended from.
 
