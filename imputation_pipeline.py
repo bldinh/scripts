@@ -404,7 +404,7 @@ if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_multithread) as executor:
         executor.map(impute_chunks, windows)
         executor.shutdown()
-    impute_glob = glob.glob(f'{outdir}/imputation/chunk_*_*.imputed.dose.vcf.gz')
+    impute_glob = glob.glob(f'{outdir}/imputation/{chrom}/chunk_*_*.imputed.dose.vcf.gz')
     print(f'expected: {len(windows)}, found: {len(impute_glob)}')
 
     assert len(windows) == len(impute_glob), 'num imputed chunks (%s) != num windows (%s) ' % (len(windows), len(impute_glob))
@@ -412,7 +412,7 @@ if __name__ == '__main__':
 
 
     #stitch imputed chunks together
-    topmed_imputation_aggregate_chunks = [f'{outdir}/imputation/chunk_{start}_{stop}.imputed.dose.vcf.gz' for start,stop in windows]
+    topmed_imputation_aggregate_chunks = [f'{outdir}/imputation/{chrom}/chunk_{start}_{stop}.imputed.dose.vcf.gz' for start,stop in windows]
 
     outchunks = f'{imputdir}/{chrom}.imputed.dose.vcf.chunks'
 
