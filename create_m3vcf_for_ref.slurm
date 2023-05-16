@@ -19,9 +19,13 @@ PLINK=path/to/plink
 MINIMAC3=path/to/mm3
 
 
-vcf=path/to/phased/ref/vcf
+vcf=path/to/phased/and/gzipped/ref/vcf
 outdir=path/to/dir/to/write/to
 outprefix=somePrefix
+
+#
+# changes below this line are not required
+#
 
 mkdir -p $outdir
 mkdir -p $outdir/ref/vcf

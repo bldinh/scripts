@@ -271,8 +271,13 @@ def impute_chunks(window):
 
     filteredchunk = open(chrfilterchunk).read().strip()
     buffersize = 2.5e6
-    imputeddosefile = outdir+f'/imputation/chunk_{start}_{stop}.imputed.dose.vcf.gz'
-    imputedprefix = outdir+f'/imputation/chunk_{start}_{stop}.imputed'
+    impute_dir = outdir+f'/imputation/{chrom}'
+    Path(impute_dir).mkdir(parents=True, exist_ok=True)
+    imputeddosefile = impute_dir+f'/chunk_{start}_{stop}.imputed.dose.vcf.gz'
+    imputedprefix = impute_dir+f'/chunk_{start}_{stop}.imputed'
+
+
+
     if filteredchunk == 'Keep' and stop - buffersize > start + buffersize:
         # check whether variants exist in imputation region:
         # chunk 1:120000001-145000000 pass QC filter, but don't have variants in
