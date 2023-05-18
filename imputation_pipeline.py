@@ -305,9 +305,28 @@ def impute_chunks(window):
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
                                     --prefix {imputedprefix}', shell=True, stdout=subprocess.DEVNULL)
+            if os.path.exists(f'{imputeddosefile}.tbi'):
+                os.remove(f'{imputeddosefile}.tbi')
+            subprocess.call(f'tabix -p vcf {imputeddosefile}', shell=True, stdout=subprocess.DEVNULL)
     else:
         subprocess.call(f'touch {imputeddosefile}', shell=True)
 
+
+def parse_info_between_pos(info_path, start_bp, end_bp):
+    #read in an info file and only keep the lines between the interval (inclusive) based on SNP name
+
+    lines = []
+    with open(info_path) as f:
+        for rline in f.read().splitlines():
+            if rline.startswith('SNP'):
+                continue
+
+            line = rline.split()
+            _, pos, _, _ = line[0].split(':')
+            pos = int(pos)
+            if start_bp <= pos <= end_bp:
+                lines.append(rline.strip())
+    return lines
 
 
 #
@@ -327,12 +346,12 @@ if __name__ == '__main__':
     pos = posdir+f'/{chrom}.pos.txt'
     temp_pos = pos+'.temp'
 
-    if os.path.isfile(pos):
-        pass
-    else:
-        #write to temp file and move if completed/successful
-        subprocess.run(f"cat {tar}.bim | cut -f4 > {temp_pos}", shell=True)
-        subprocess.run(f"mv {temp_pos} {pos}", shell=True)
+    #if os.path.isfile(pos):
+    #    pass
+    #else:
+    #    #write to temp file and move if completed/successful
+    #    subprocess.run(f"cat {tar}.bim | cut -f4 > {temp_pos}", shell=True)
+    #    subprocess.run(f"mv {temp_pos} {pos}", shell=True)
 
     with open(pos) as f:
         positions = [int(line) for line in f.read().splitlines()]
@@ -347,9 +366,9 @@ if __name__ == '__main__':
 
     #extract target chunks
     chr_dir = f'{qcdir}/{chrom}'
-    if os.path.isdir(chr_dir):
-        shutil.rmtree(chr_dir)
-    Path(chr_dir).mkdir(parents=True, exist_ok=True)
+    #if os.path.isdir(chr_dir):
+    #    shutil.rmtree(chr_dir)
+    #Path(chr_dir).mkdir(parents=True, exist_ok=True)
 
     bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
     windows = position_windows(pos=np.array(bim['pos']), size=int(chunksize), start=1, step=int(chunksize-overlap))
@@ -421,19 +440,105 @@ if __name__ == '__main__':
     for f in topmed_imputation_aggregate_chunks:
         print(f'parsing input: {f} ({os.stat(f).st_size})')
         if os.stat(f).st_size != 0:
-            start = int(f.split('/')[-1].split('_')[1])
+            start = int(os.path.basename(f).split('_')[1])
             chunk_vcfs.append((start, f))
+            if os.path.exists(f'{f}.tbi'):
+                os.remove(f'{f}.tbi')
+            print(f'tabix -p vcf {f}')
+            subprocess.run(f'tabix -p vcf {f}', shell=True)
     chunk_vcfs = np.array(chunk_vcfs, dtype=dtype)
     chunk_vcfs = np.sort(chunk_vcfs, order='start')
     chunk_vcfs = list(chunk_vcfs['file'])
-    for chunk in chunk_vcfs:
-        print(chunk)
+
+    imputchromvcf = f'{imputdir}/{chrom}.dose.vcf.gz'
+    imputchrominfo = f'{imputdir}/{chrom}.info.gz'
+
+    new_chunk_vcfs = []
+
+    #check if next file overlaps
+    idx = 0
+    if len(chunk_vcfs) > 0:
+        chunk_infos = [chunk.replace('dose.vcf.gz','info') for chunk in chunk_vcfs]
+
+        with gzip.open(imputchrominfo, 'wt') as g:
+            #write info header
+            g.write('SNP	REF(0)	ALT(1)	ALT_Frq	MAF	AvgCall	Rsq	Genotyped	LooRsq	EmpR	EmpRsq	Dose0	Dose1\n')
+            while idx < len(chunk_vcfs)-1:
+                chunk = chunk_vcfs[idx]
+                info = chunk_infos[idx]
+                next_chunk = chunk_vcfs[idx+1]
+
+                if os.path.exists(f'{chunk}.tbi'):
+                    os.remove(f'{chunk}.tbi')
+                print(f'tabix -p vcf {chunk}')
+                subprocess.run(f'tabix -p vcf {chunk}', shell=True)
+                if os.path.exists(f'{next_chunk}.tbi'):
+                    os.remove(f'{next_chunk}.tbi')
+                print(f'tabix -p vcf {next_chunk}')
+                subprocess.run(f'tabix -p vcf {next_chunk}', shell=True)
+
+                print(chunk)
+                #{outdir}/imputation/{chrom}/chunk_1_25000000.imputed.dose.vcf.gz
+
+                cur_start = int(os.path.basename(chunk).split('_')[1])
+                cur_stop = int(os.path.basename(chunk).split('_')[2].split('.')[0])
+                next_start = int(os.path.basename(next_chunk).split('_')[1])
+                next_stop = int(os.path.basename(next_chunk).split('_')[2].split('.')[0])
+
+                if next_start < cur_stop:
+                    #overlap!
+
+                    #change cur stop to new pos and extract vcf, update to new path
+                    new_cur_stop = cur_stop - int(overlap/2)
+                    new_chunk = chunk.replace(str(cur_stop), str(new_cur_stop))
+                    new_chunk_vcfs.append(new_chunk)
+                    subprocess.call(f'bcftools view -r {chrom}:{cur_start}-{new_cur_stop} -Oz -o {new_chunk} {chunk}', shell=True)
+                    if os.path.exists(f'{new_chunk}.tbi'):
+                        os.remove(f'{new_chunk}.tbi')
+                    print(f'tabix -p vcf {new_chunk}')
+                    subprocess.check_output(f'tabix -p vcf {new_chunk}', shell=True)
+                    #chunk_vcfs[idx] = new_chunk
+
+                    #write info up to new stop
+                    valid_info_lines = parse_info_between_pos(info, cur_start, new_cur_stop)
+                    for line in valid_info_lines:
+                        g.write(f'{line}\n')
+
+                    #change next_start to new pos, extract vcf, update to new path
+                    new_next_start = next_start + int(overlap/2)
+                    new_next_chunk = next_chunk.replace(str(next_start), str(new_next_start))
+                    subprocess.call(f'bcftools view -r {chrom}:{new_next_start}-{next_stop} -Oz -o {new_next_chunk} {next_chunk}', shell=True)
+                    if os.path.exists(f'{new_next_chunk}.tbi'):
+                        os.remove(f'{new_next_chunk}.tbi')
+                    print(f'tabix -p vcf {new_next_chunk}')
+                    subprocess.check_output(f'tabix -p vcf {new_next_chunk}', shell=True)
+                    chunk_vcfs[idx+1] = new_next_chunk
+                else:
+                    #no overlap
+                    #can write full info for current chunk
+                    with open(info) as f:
+                        lines = [rline.strip() for rline in f.read().splitlines()[1:]]
+                    for line in lines:
+                        g.write(f'{line}\n')
+                idx += 1
+            if idx == len(chunk_vcfs)-1:
+                chunk = chunk_vcfs[idx]
+                new_chunk_vcfs.append(chunk)
+                info = chunk_infos[idx]
+                cur_start = int(os.path.basename(chunk).split('_')[1])
+                cur_stop = int(os.path.basename(chunk).split('_')[2].split('.')[0])
+
+                valid_info_lines = parse_info_between_pos(info, cur_start, cur_stop)
+                for line in valid_info_lines:
+                    g.write(f'{line}\n')
+
     print(f'writing to {outchunks}')
     with open(outchunks, 'w') as f:
-        f.write('\n'.join(chunk_vcfs))
+        f.write('\n'.join(new_chunk_vcfs))
     print(f'writing done')
 
-    imputchromvcf = f'{imputdir}/{chrom}.imputed.dose.vcf.gz'
-    subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -f {outchunks}', shell=True)
-
+    chunkstring = ' '.join(new_chunk_vcfs)
+    print('concatenating chunks')
+    subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -a -d all {chunkstring}', shell=True)
+    print('concatenating done')
 
