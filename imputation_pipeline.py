@@ -346,12 +346,12 @@ if __name__ == '__main__':
     pos = posdir+f'/{chrom}.pos.txt'
     temp_pos = pos+'.temp'
 
-    #if os.path.isfile(pos):
-    #    pass
-    #else:
-    #    #write to temp file and move if completed/successful
-    #    subprocess.run(f"cat {tar}.bim | cut -f4 > {temp_pos}", shell=True)
-    #    subprocess.run(f"mv {temp_pos} {pos}", shell=True)
+    if os.path.isfile(pos):
+        pass
+    else:
+        #write to temp file and move if completed/successful
+        subprocess.run(f"cat {tar}.bim | cut -f4 > {temp_pos}", shell=True)
+        subprocess.run(f"mv {temp_pos} {pos}", shell=True)
 
     with open(pos) as f:
         positions = [int(line) for line in f.read().splitlines()]
@@ -366,9 +366,9 @@ if __name__ == '__main__':
 
     #extract target chunks
     chr_dir = f'{qcdir}/{chrom}'
-    #if os.path.isdir(chr_dir):
-    #    shutil.rmtree(chr_dir)
-    #Path(chr_dir).mkdir(parents=True, exist_ok=True)
+    if os.path.isdir(chr_dir):
+        shutil.rmtree(chr_dir)
+    Path(chr_dir).mkdir(parents=True, exist_ok=True)
 
     bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
     windows = position_windows(pos=np.array(bim['pos']), size=int(chunksize), start=1, step=int(chunksize-overlap))
@@ -478,7 +478,6 @@ if __name__ == '__main__':
                 subprocess.run(f'tabix -p vcf {next_chunk}', shell=True)
 
                 print(chunk)
-                #{outdir}/imputation/{chrom}/chunk_1_25000000.imputed.dose.vcf.gz
 
                 cur_start = int(os.path.basename(chunk).split('_')[1])
                 cur_stop = int(os.path.basename(chunk).split('_')[2].split('.')[0])
