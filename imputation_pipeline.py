@@ -17,9 +17,9 @@ import subprocess
 # Program paths
 #
 
-PLINK = '/scratch1/bldinh/programs/plink'
-EAGLE = '/scratch1/bldinh/programs/eagle'
-GMAP = '/scratch1/bldinh/programs/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz'
+PLINK = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/plink'
+EAGLE = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/eagle'
+GMAP = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/genetic_map_hg38_withX.txt.gz'
 MM4 = '/project/chia657_28/programs/minimac4/bin/minimac4'
 
 parser = argparse.ArgumentParser()
