@@ -373,9 +373,11 @@ if __name__ == '__main__':
     bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
     windows = position_windows(pos=np.array(bim['pos']), size=int(chunksize), start=1, step=int(chunksize-overlap))
 
+    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
+    imputdir = outdir+'/imputation'
+    Path(imputdir).mkdir(parents=True, exist_ok=True)
+
     refbim_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
-
-
 
     #with 1 worker each
     print(f'creating chunks')
@@ -391,7 +393,6 @@ if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         executor.map(qc_chunks, windows)
         executor.shutdown()
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
     qc_glob = glob.glob(f'{chrfilter_dir}/chunk_*_*.txt')
     print(f'expected: {len(windows)}, found: {len(qc_glob)}')
 
@@ -417,8 +418,6 @@ if __name__ == '__main__':
 
 
     #with multicore workers each
-    imputdir = outdir+'/imputation'
-    Path(imputdir).mkdir(parents=True, exist_ok=True)
     print(f'impute chunks')
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_multithread) as executor:
         executor.map(impute_chunks, windows)
@@ -426,12 +425,12 @@ if __name__ == '__main__':
     impute_glob = glob.glob(f'{outdir}/imputation/{chrom}/chunk_*_*.imputed.dose.vcf.gz')
     print(f'expected: {len(windows)}, found: {len(impute_glob)}')
 
-    assert len(windows) == len(impute_glob), 'num imputed chunks (%s) != num windows (%s) ' % (len(windows), len(impute_glob))
-
-
+    topmed_imputation_aggregate_chunks = [f'{outdir}/imputation/{chrom}/chunk_{start}_{stop}.imputed.dose.vcf.gz' for start,stop in windows]
+    for chunk in topmed_imputation_aggregate_chunks:
+        #assert len(windows) == len(impute_glob), 'num imputed chunks (%s) != num windows (%s) ' % (len(windows), len(impute_glob))
+        assert os.path.exists(f'{chunk}') == True, '%s does not exist' % (chunk)
 
     #stitch imputed chunks together
-    topmed_imputation_aggregate_chunks = [f'{outdir}/imputation/{chrom}/chunk_{start}_{stop}.imputed.dose.vcf.gz' for start,stop in windows]
 
     outchunks = f'{imputdir}/{chrom}.imputed.dose.vcf.chunks'
 
