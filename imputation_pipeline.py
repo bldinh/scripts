@@ -135,6 +135,8 @@ def qc_chunks(window):
     chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
     chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
     chunkbi_pd = pd.read_csv(chunkbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
+    #chunkbi_pd[['a1','a2']] = chunkbi_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
+    #chunkbi_pd['chrompos'] = chunkbi_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
 
     no_valid_variants = refbim_pd.loc[refbim_pd['snp'].isin(chunkbi_pd['snp'])].shape[0]
     percent_valid_variants = no_valid_variants/refbim_pd.shape[0]
@@ -377,7 +379,10 @@ if __name__ == '__main__':
     imputdir = outdir+'/imputation'
     Path(imputdir).mkdir(parents=True, exist_ok=True)
 
+    update_bim_snpname(refbim)
     refbim_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
+    #refbim_pd[['a1','a2']] = refbim_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
+    #refbim_pd['chrompos'] = refbim_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
 
     #with 1 worker each
     print(f'creating chunks')
