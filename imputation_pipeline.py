@@ -293,7 +293,9 @@ def impute_chunks(window):
                     empty_imputation_region = False
                     break
         if empty_imputation_region:
-            subprocess.call(f'touch {imputeddosefile}', shell=True)
+            cmd = f'touch {imputeddosefile}'
+            print(f'empty impute region, running:{cmd}')
+            subprocess.call(cmd, shell=True)
         else:
             subprocess.call(f'{MM4} --refHaps {refm3} \
                                     --haps {phasedvcf} --chr {chrom} \
@@ -306,12 +308,15 @@ def impute_chunks(window):
                                     --meta \
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
-                                    --prefix {imputedprefix}', shell=True, stdout=subprocess.DEVNULL)
+                                    --prefix {imputedprefix}', shell=True)
+                                    #--prefix {imputedprefix}', shell=True, stdout=subprocess.DEVNULL)
             if os.path.exists(f'{imputeddosefile}.tbi'):
                 os.remove(f'{imputeddosefile}.tbi')
             subprocess.call(f'tabix -p vcf {imputeddosefile}', shell=True, stdout=subprocess.DEVNULL)
     else:
-        subprocess.call(f'touch {imputeddosefile}', shell=True)
+        cmd = f'touch {imputeddosefile}'
+        print(f'failed "Keep" and start/stop check, running:{cmd}')
+        subprocess.call(cmd, shell=True)
 
 
 def parse_info_between_pos(info_path, start_bp, end_bp):
@@ -324,8 +329,7 @@ def parse_info_between_pos(info_path, start_bp, end_bp):
                 continue
 
             line = rline.split()
-            _, pos, _, _ = line[0].split(':')
-            pos = int(pos)
+            pos = int(line[0].split(':')[1])
             if start_bp <= pos <= end_bp:
                 lines.append(rline.strip())
     return lines
@@ -368,6 +372,8 @@ if __name__ == '__main__':
 
     #extract target chunks
     chr_dir = f'{qcdir}/{chrom}'
+    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
+    imputdir = outdir+'/imputation'
     if os.path.isdir(chr_dir):
         shutil.rmtree(chr_dir)
     Path(chr_dir).mkdir(parents=True, exist_ok=True)
@@ -375,14 +381,12 @@ if __name__ == '__main__':
     bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
     windows = position_windows(pos=np.array(bim['pos']), size=int(chunksize), start=1, step=int(chunksize-overlap))
 
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    imputdir = outdir+'/imputation'
     Path(imputdir).mkdir(parents=True, exist_ok=True)
 
     update_bim_snpname(refbim)
     refbim_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
-    #refbim_pd[['a1','a2']] = refbim_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
-    #refbim_pd['chrompos'] = refbim_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
+        #refbim_pd[['a1','a2']] = refbim_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
+        #refbim_pd['chrompos'] = refbim_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
 
     #with 1 worker each
     print(f'creating chunks')
