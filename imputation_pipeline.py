@@ -547,5 +547,8 @@ if __name__ == '__main__':
     chunkstring = ' '.join(new_chunk_vcfs)
     print('concatenating chunks')
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -a -d all {chunkstring}', shell=True)
-    print('concatenating done')
+    if os.path.exists(f'{imputchromvcf}.tbi'):
+        os.remove(f'{imputchromvcf}.tbi')
+    subprocess.run(f'tabix -p vcf {imputchromvcf}', shell=True)
+    print('concatenating and tabix done')
 
