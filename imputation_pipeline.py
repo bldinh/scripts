@@ -35,6 +35,7 @@ parser.add_argument('--windowsize', required=False, help='mm4 window size in bp'
 parser.add_argument('--chunksize', required=False, help='chunk size in bp', default=25e6)
 parser.add_argument('--overlap', required=False, help='overlap size in bp', default=5e6)
 parser.add_argument('--multicore', required=False, help='number of workers to use when multithreading', default=5)
+parser.add_argument('--nophasing', type=bool, action='store_true', help='Skips phasing during pipeline (for analyses such as meta-imputation)')
 
 args = parser.parse_args()
 tar = args.tar
@@ -49,6 +50,7 @@ chunksize = int(args.chunksize)
 overlap = int(args.overlap)
 windowsize = int(args.windowsize)
 multicore = int(args.multicore)
+nophasing = args.nophasing
 
 #
 # Params
@@ -229,20 +231,19 @@ def filter_chunks(window):
 
 
 def phase_chunks(window):
+    #input
     start, stop = window
-    chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
-    chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
     chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
     chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
     filteredprefix = chrfilter_dir+f'/chunk_{start}_{stop}'
     bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
     index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
 
+    #output
     phasedprefix = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased'
     phasedvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
 
     filteredchunk = open(chrfilterchunk).read().strip()
-
     if filteredchunk == 'Keep':
         subprocess.call(f'{EAGLE} --vcfRef {ref} \
                                   --vcfTarget {bcf} \
@@ -258,8 +259,25 @@ def phase_chunks(window):
         subprocess.call(f'touch {phasedvcf}', shell=True)
 
 
+def convert_bcf_to_vcf_without_phasing(window):
+    #input
+    start, stop = window
+    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
+    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
+    bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
+
+    #output
+    preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.notrephased.vcf.gz'
+
+    filteredchunk = open(chrfilterchunk).read().strip()
+    if filteredchunk == 'Keep':
+        subprocess.call(f'bcftools view -Oz -o {preimputationvcf} --threads {multicore} {bcf}', shell=True, stdout=subprocess.DEVNULL)
+    else:
+        subprocess.call(f'touch {preimputationvcf}', shell=True)
+
+
 def impute_chunks(window):
-    #done after phasing
+    #input
     start, stop = window
     chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
     chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
@@ -269,7 +287,10 @@ def impute_chunks(window):
     bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
     index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
 
-    phasedvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
+    if nophasing:
+        preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.notrephased.vcf.gz'
+    else:
+        preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
 
     filteredchunk = open(chrfilterchunk).read().strip()
     buffersize = 2.5e6
@@ -278,14 +299,12 @@ def impute_chunks(window):
     imputeddosefile = impute_dir+f'/chunk_{start}_{stop}.imputed.dose.vcf.gz'
     imputedprefix = impute_dir+f'/chunk_{start}_{stop}.imputed'
 
-
-
     if filteredchunk == 'Keep' and stop - buffersize > start + buffersize:
         # check whether variants exist in imputation region:
         # chunk 1:120000001-145000000 pass QC filter, but don't have variants in
         # imputation region 1:122000001-143000000
         empty_imputation_region = True
-        for line in gzip.open(phasedvcf, 'rt'):
+        for line in gzip.open(preimputationvcf, 'rt'):
             if not re.search('^#', line):
                 line = line.split('\t', 2)
                 pos = int(line[1])
@@ -298,7 +317,7 @@ def impute_chunks(window):
             subprocess.call(cmd, shell=True)
         else:
             subprocess.call(f'{MM4} --refHaps {refm3} \
-                                    --haps {phasedvcf} --chr {chrom} \
+                                    --haps {preimputationvcf} --chr {chrom} \
                                     --start {start} \
                                     --end {stop} \
                                     --window {windowsize} \
@@ -416,13 +435,22 @@ if __name__ == '__main__':
 
 
 
-    #with multicore workers each
-    print(f'phase chunks')
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_multithread) as executor:
-        executor.map(phase_chunks, windows)
-        executor.shutdown()
-    phase_glob = glob.glob(chrfilter_dir+f'/chunk_*_*.phased.vcf.gz')
-    print(f'expected: {len(windows)}, found: {len(phase_glob)}')
+    if nophasing:
+        #convert bcf to vcf for imputation step
+        print(f'converting chunks (without phasing)')
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_multithread) as executor:
+            executor.map(convert_bcf_to_vcf_without_phasing, windows)
+            executor.shutdown()
+        phase_glob = glob.glob(chrfilter_dir+f'/chunk_*_*.notrephased.vcf.gz')
+        print(f'expected: {len(windows)}, found: {len(phase_glob)}')
+    else:
+        #with multicore workers each
+        print(f'phase chunks')
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_multithread) as executor:
+            executor.map(phase_chunks, windows)
+            executor.shutdown()
+        phase_glob = glob.glob(chrfilter_dir+f'/chunk_*_*.phased.vcf.gz')
+        print(f'expected: {len(windows)}, found: {len(phase_glob)}')
 
 
 
