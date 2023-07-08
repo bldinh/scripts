@@ -23,10 +23,10 @@ GMAP = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/program
 MM4 = '/project/chia657_28/programs/minimac4/bin/minimac4'
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--tar', required=True, help='prefix for plink format target data')
-parser.add_argument('--ref', required=True, help='phased reference data')
-parser.add_argument('--refm3', required=True, help='m3vcf')
-parser.add_argument('--refbim', required=True, help='bim')
+parser.add_argument('--tar', required=True, help='target data VCF')
+parser.add_argument('--ref', required=True, help='phased reference VCF')
+parser.add_argument('--refm3', required=True, help='reference m3vcf')
+#parser.add_argument('--refbim', required=True, help='bim')
 parser.add_argument('--chrom', required=True, help='format the same way as hg38 (e.g. "chr22")')
 parser.add_argument('--outdir', required=True, help='without trailing /')
 parser.add_argument('--workers', required=True, help='number of chunks to work on at same time')
@@ -41,7 +41,7 @@ args = parser.parse_args()
 tar = args.tar
 ref = args.ref
 refm3 = args.refm3
-refbim = args.refbim
+#refbim = args.refbim
 chrom = args.chrom
 outdir = args.outdir
 workers = int(args.workers)
@@ -64,6 +64,7 @@ minsampleCallRate = 0.5
 alleles = ['A', 'T', 'C', 'G']
 minsnpCallRate = 0.9
 min_maf = 1e-10 # remove monomorphic snps
+buffersize = 2.5e6
 
 #
 # Functions
@@ -120,184 +121,169 @@ def update_bim_snpname(bim_fn):
     bim.to_csv(bim_fn, sep='\t', index=False, header=False)
 
 
+def get_chrompos_pd_from_vcf(filepath):
+    #read in vcf and parse for chrom, pos, ref, and alt
+
+    if filepath.endswith('.gz'):
+        cat_prefix = 'z'
+    else:
+        cat_prefix = ''
+    lines = [l.split() for l in subprocess.check_output(f"{cat_prefix}cat {filepath} | grep ^[^#] | cut -f1-2,4-5 | head", shell=True).decode().splitlines()]
+    lines = [f'{l[0]},{l[1]},{sorted([l[2],l[3]])[0]}{sorted([l[2],l[3]])[1]}' for l in lines]
+    df = pd.DataFrame(lines, columns=['snp'])
+    return df
+
+
 def create_chunks(window):
     #parse vcf between start and end
-
     start, stop = window
     chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
+    subprocess.call(f'bcftools view -Oz -o {chunkprefix}.vcf.gz -r {chrom}:{start}-{stop} {tar}', shell=True, stdout=subprocess.DEVNULL)
 
-    subprocess.call(f'{PLINK} --bfile {tar} --chr {chrom} --from-bp {start} --to-bp {stop} --memory {mem_per_worker} --make-bed --out {chunkprefix}', shell=True, stdout=subprocess.DEVNULL)
-    update_bim_snpname(chunkprefix+'.bim')
+
+def create_pathdict_by_window(window):
+    start, stop = window
+
+    d = {}
+    d['chunkprefix'] = chr_dir+f'/chunk_{start}_{stop}'
+    d['chunkvcf'] = chr_dir+f'/chunk_{start}_{stop}.vcf.gz'
+    d['chrmissing_dir'] = f'{qcdir}/{chrom}_missing'
+
+    d['chunkmissingprefix'] = f'{d["chrmissing_dir"]}/chunk_{start}_{stop}'
+    d['chrfilter_dir'] = f'{qcdir}/{chrom}_filteredChunk'
+    d['chrfilterchunk'] = f'{d["chrfilter_dir"]}/chunk_{start}_{stop}.txt'
+
+    #d['filteredprefix'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}'
+    #d['filteredprefixwithchr'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr'
+    d['snpsfile'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.snps'
+
+    d['bcf'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr.bcf'
+    d['index'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr.bcf.csi'
+
+    d['chrmissing_dir'] = f'{qcdir}/{chrom}_missing'
+    d['chunkmissingprefix'] = f'{d["chrmissing_dir"]}/chunk_{start}_{stop}'
+
+    d['phasedprefix'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr.phased'
+    d['phasedvcf'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
+    d['skipphasevcf'] = d['chrfilter_dir']+f'/chunk_{start}_{stop}.withchr.notrephased.vcf.gz'
+
+    d['imputeddosefile'] = impute_dir+f'/chunk_{start}_{stop}.imputed.dose.vcf.gz'
+    d['imputedprefix'] = impute_dir+f'/chunk_{start}_{stop}.imputed'
+    return d
 
 
 def qc_chunks(window):
-    #parse vcf between start and end
+    w_dict = create_pathdict_by_window(window)
 
-    start, stop = window
-    chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
-    chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
-    chunkbi_pd = pd.read_csv(chunkbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
-    #chunkbi_pd[['a1','a2']] = chunkbi_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
-    #chunkbi_pd['chrompos'] = chunkbi_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
+    chunk_pd = get_chrompos_pd_from_vcf(w_dict['chunkvcf'])
+    num_valid_variants = ref_pd.loc[ref_pd['snp'].isin(chunk_pd['snp'])].shape[0]
+    percent_valid_variants = num_valid_variants/ref_pd.shape[0]
+    Path(w_dict['chrmissing_dir']).mkdir(parents=True, exist_ok=True)
+    subprocess.call(f'{PLINK} --vcf {w_dict["chunkvcf"]} --missing --memory {mem_per_worker} --out {w_dict["chunkmissingprefix"]}', shell=True, stdout=subprocess.DEVNULL)
+    missing = pd.read_csv(w_dict['chunkmissingprefix']+'.imiss', sep='\s+')
+    num_high_missing = missing.loc[missing['F_MISS'] > (1-minsampleCallRate)].shape[0]
+    Path(w_dict['chrfilter_dir']).mkdir(parents=True, exist_ok=True)
 
-    no_valid_variants = refbim_pd.loc[refbim_pd['snp'].isin(chunkbi_pd['snp'])].shape[0]
-    percent_valid_variants = no_valid_variants/refbim_pd.shape[0]
-
-    chrmissing_dir = f'{qcdir}/{chrom}_missing'
-    Path(chrmissing_dir).mkdir(parents=True, exist_ok=True)
-
-    chunkmissingprefix = f'{chrmissing_dir}/chunk_{start}_{stop}'
-    subprocess.call(f'{PLINK} --bfile {chunkprefix} --missing --memory {mem_per_worker} --out {chunkmissingprefix}', shell=True, stdout=subprocess.DEVNULL)
-    missing = pd.read_csv(chunkmissingprefix+'.imiss', sep='\s+')
-    no_high_missing = missing.loc[missing['F_MISS'] > (1-minsampleCallRate)].shape[0]
-
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    Path(chrfilter_dir).mkdir(parents=True, exist_ok=True)
-    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
-
-    with open(chrfilterchunk, 'w') as f:
-        #if no_valid_variants < min_valid_variants or percent_valid_variants < min_percent_valid_variants or no_high_missing > 0:
-        if no_valid_variants < min_valid_variants or no_high_missing > 0:
-            f.write(f'Exclude\t{no_valid_variants}\t{percent_valid_variants}\t{no_high_missing}')
+    with open(w_dict['chrfilterchunk'], 'w') as f:
+        if num_valid_variants < min_valid_variants or num_high_missing > 0:
+            f.write(f'Exclude\t{num_valid_variants}\t{percent_valid_variants}\t{num_high_missing}')
         else:
             f.write('Keep')
 
 
 def filter_chunks(window):
-    start, stop = window
-    chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
-    chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
-    filteredprefix = chrfilter_dir+f'/chunk_{start}_{stop}'
-    filteredprefixwithchr = chrfilter_dir+f'/chunk_{start}_{stop}.withchr'
-    snpsfile = chrfilter_dir+f'/chunk_{start}_{stop}.snps'
-    bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
-    index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
-    chrmissing_dir = f'{qcdir}/{chrom}_missing'
-    chunkmissingprefix = f'{chrmissing_dir}/chunk_{start}_{stop}'
+    w_dict = create_pathdict_by_window(window)
 
-    filteredchunk = open(chrfilterchunk).read().strip()
-    print(filteredchunk)
+    filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
 
     if filteredchunk == 'Keep':
-        print(f'opening keep')
+        #read bim into df
+        lines = [l.split() for l in subprocess.check_output(f"zcat {w_dict['chunkvcf']} | grep ^[^#] | cut -f1-2,4-5", shell=True).decode().splitlines()]
+        lines = [[l[0], l[1], sorted([l[2],l[3]])[0], sorted([l[2],l[3]])[1]] for l in lines]
+        bim = pd.DataFrame(lines, columns=['chr', 'pos', 'a1', 'a2'])
+        bim['snp'] = bim.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}{row['a2']}", axis=1)
 
-        bim = pd.read_csv(chunkbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
+        # pick loc of snps only
         bim = bim.loc[(bim['a1'].isin(alleles+['0'])) & (bim['a2'].isin(alleles+['0']))]
         pos = np.array(bim['pos'])
 
+        # make sure dis is not negative
         dis = pos[1:] - pos[:-1]
         if (dis < 0).sum() > 0:
             print(f'Positions are not inc in bim')
             return
 
-        # filter A T C G
-        # filter duplicates (and pos - 1 == pos)
         snp = np.array(bim['snp'])
         duplicates = np.append(snp[:-1][dis<=1], snp[1:][dis<=1])
         bim = bim.loc[~bim['snp'].isin(duplicates)]
 
         # filter missing rate / call rate
-        lmissfile = chunkmissingprefix+'.lmiss'
+        lmissfile = w_dict['chunkmissingprefix']+'.lmiss'
         highmissing = pd.read_csv(lmissfile, sep='\s+')
         highmissing = highmissing.loc[highmissing['F_MISS'] > (1-minsnpCallRate)]
         bim = bim.loc[~bim['snp'].isin(highmissing['SNP'])]
 
-        # extract snps
-        print(snpsfile)
-        bim['snp'].to_csv(snpsfile, sep='\t', index=False, header=False)
-        bim['ref'] = bim['snp'].str.split(pat='_', expand=True).iloc[:,2]
-        bim[['snp', 'ref']].to_csv(snpsfile+'.ref', sep='\t', index=False, header=False)
-
-        plink_cmd = f'{PLINK} --bfile {chunkprefix} --extract {snpsfile} --maf {min_maf} --memory {mem_per_worker} --a2-allele {snpsfile}.ref 2 1 --recode vcf-iid bgz --out {filteredprefix}'
-        print(plink_cmd)
-        subprocess.call(plink_cmd, shell=True)
-        #parse vcf to add "chr"
-        with gzip.open(f'{filteredprefix}.vcf.gz', 'rt') as f:
-            with gzip.open(f'{filteredprefixwithchr}.vcf.gz', 'wt') as g:
-                for rline in f:
-                    line = rline.strip()
-                    if line.startswith('#'):
-                        chr_num = chrom.replace('chr','')
-                        g.write(f'{line}\n'.replace(f'ID={chr_num}', f'ID={chrom}'))
-                    else:
-                        g.write(f'chr{line}\n')
-
-        subprocess.call(f'bcftools view -Ob -o {bcf} {filteredprefixwithchr}.vcf.gz', shell=True)
-        subprocess.call(f'bcftools index {bcf}', shell=True)
+        # extract snps and convert to bcf, then index
+        bim['snp'].to_csv(w_dict['snpsfile'], sep='\t', index=False, header=False)
+        bcftools_cmd = f'bcftools view --include ID==@{w_dict["snpsfile"]} -Ob -o {w_dict["bcf"]}.vcf.gz {w_dict["chunkvcf"]}'
+        subprocess.call(bcftools_cmd, shell=True)
+        subprocess.call(f'bcftools index {w_dict["bcf"]}', shell=True)
     else:
-        subprocess.call(f'touch {bcf} {index}', shell=True)
+        subprocess.call(f'touch {w_dict["bcf"]} {w_dict["index"]}', shell=True)
 
 
 def phase_chunks(window):
-    #input
+    w_dict = create_pathdict_by_window(window)
     start, stop = window
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
-    filteredprefix = chrfilter_dir+f'/chunk_{start}_{stop}'
-    bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
-    index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
 
-    #output
-    phasedprefix = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased'
-    phasedvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
-
-    filteredchunk = open(chrfilterchunk).read().strip()
+    filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
     if filteredchunk == 'Keep':
         subprocess.call(f'{EAGLE} --vcfRef {ref} \
-                                  --vcfTarget {bcf} \
+                                  --vcfTarget {w_dict["bcf"]} \
                                   --geneticMapFile {GMAP} \
                                   --chrom {chrom} \
                                   --bpStart {start} \
                                   --bpEnd {stop} \
-                                  --outPrefix {phasedprefix} \
+                                  --outPrefix {w_dict["phasedprefix"]} \
                                   --numThreads {multicore} \
                                   --allowRefAltSwap \
                                   --vcfOutFormat z', shell=True, stdout=subprocess.DEVNULL)
     else:
-        subprocess.call(f'touch {phasedvcf}', shell=True)
+        subprocess.call(f'touch {w_dict["phasedvcf"]}', shell=True)
 
 
 def convert_bcf_to_vcf_without_phasing(window):
-    #input
-    start, stop = window
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
-    bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
+    # previously plink -> bcf -> vcf
+    # now vcf -> bcf -> vcf
 
-    #output
-    preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.notrephased.vcf.gz'
+    w_dict = create_pathdict_by_window(window)
 
-    filteredchunk = open(chrfilterchunk).read().strip()
+    filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
     if filteredchunk == 'Keep':
-        subprocess.call(f'bcftools view -Oz -o {preimputationvcf} --threads {multicore} {bcf}', shell=True, stdout=subprocess.DEVNULL)
+        subprocess.call(f'bcftools view -Oz -o {w_dict["skipphasevcf"]} --threads {multicore} {w_dict["bcf"]}', shell=True, stdout=subprocess.DEVNULL)
     else:
-        subprocess.call(f'touch {preimputationvcf}', shell=True)
+        subprocess.call(f'touch {w_dict["skipphasevcf"]}', shell=True)
 
 
 def impute_chunks(window):
-    #input
+    w_dict = create_pathdict_by_window(window)
     start, stop = window
-    chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
-    chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
-    chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
-    chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
-    filteredprefix = chrfilter_dir+f'/chunk_{start}_{stop}'
-    bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
-    index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
+
+    ##input
+    #chunkprefix = chr_dir+f'/chunk_{start}_{stop}'
+    #chunkbim = chr_dir+f'/chunk_{start}_{stop}.bim'
+    #chrfilter_dir = f'{qcdir}/{chrom}_filteredChunk'
+    #chrfilterchunk = f'{chrfilter_dir}/chunk_{start}_{stop}.txt'
+    #filteredprefix = chrfilter_dir+f'/chunk_{start}_{stop}'
+    #bcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf'
+    #index = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.bcf.csi'
 
     if nophasing:
-        preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.notrephased.vcf.gz'
+        preimputationvcf = w_dict['skipphasevcf']
     else:
-        preimputationvcf = chrfilter_dir+f'/chunk_{start}_{stop}.withchr.phased.vcf.gz'
+        preimputationvcf = w_dict['phasedvcf']
 
-    filteredchunk = open(chrfilterchunk).read().strip()
-    buffersize = 2.5e6
-    impute_dir = outdir+f'/imputation/{chrom}'
-    Path(impute_dir).mkdir(parents=True, exist_ok=True)
-    imputeddosefile = impute_dir+f'/chunk_{start}_{stop}.imputed.dose.vcf.gz'
-    imputedprefix = impute_dir+f'/chunk_{start}_{stop}.imputed'
+    filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
 
     if filteredchunk == 'Keep' and stop - buffersize > start + buffersize:
         # check whether variants exist in imputation region:
@@ -312,7 +298,7 @@ def impute_chunks(window):
                     empty_imputation_region = False
                     break
         if empty_imputation_region:
-            cmd = f'touch {imputeddosefile}'
+            cmd = f'touch {w_dict["imputeddosefile"]}'
             print(f'empty impute region, running:{cmd}')
             subprocess.call(cmd, shell=True)
         else:
@@ -327,13 +313,12 @@ def impute_chunks(window):
                                     --meta \
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
-                                    --prefix {imputedprefix}', shell=True)
-                                    #--prefix {imputedprefix}', shell=True, stdout=subprocess.DEVNULL)
-            if os.path.exists(f'{imputeddosefile}.tbi'):
-                os.remove(f'{imputeddosefile}.tbi')
-            subprocess.call(f'tabix -p vcf {imputeddosefile}', shell=True, stdout=subprocess.DEVNULL)
+                                    --prefix {w_dict["imputedprefix"]}', shell=True)
+            if os.path.exists(f'{w_dict["imputeddosefile"]}.tbi'):
+                os.remove(f'{w_dict["imputeddosefile"]}.tbi')
+            subprocess.call(f'tabix -p vcf {w_dict["imputeddosefile"]}', shell=True, stdout=subprocess.DEVNULL)
     else:
-        cmd = f'touch {imputeddosefile}'
+        cmd = f'touch {w_dict["imputeddosefile"]}'
         print(f'failed "Keep" and start/stop check, running:{cmd}')
         subprocess.call(cmd, shell=True)
 
@@ -375,7 +360,7 @@ if __name__ == '__main__':
         pass
     else:
         #write to temp file and move if completed/successful
-        subprocess.run(f"cat {tar}.bim | cut -f4 > {temp_pos}", shell=True)
+        subprocess.run(f"zcat {tar} | grep ^[^#] | cut -f2 > {temp_pos}", shell=True)
         subprocess.run(f"mv {temp_pos} {pos}", shell=True)
 
     with open(pos) as f:
@@ -397,22 +382,23 @@ if __name__ == '__main__':
         shutil.rmtree(chr_dir)
     Path(chr_dir).mkdir(parents=True, exist_ok=True)
 
-    bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
-    windows = position_windows(pos=np.array(bim['pos']), size=int(chunksize), start=1, step=int(chunksize-overlap))
+    #bim = pd.read_csv(tar+'.bim', sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
+    windows = position_windows(pos=np.array(positions), size=int(chunksize), start=1, step=int(chunksize-overlap))
 
     Path(imputdir).mkdir(parents=True, exist_ok=True)
 
-    update_bim_snpname(refbim)
-    refbim_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
-        #refbim_pd[['a1','a2']] = refbim_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
-        #refbim_pd['chrompos'] = refbim_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
+    #update_bim_snpname(refbim)
+    #ref_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
+    ref_pd = get_chrompos_pd_from_vcf(refvcf)
+    #ref_pd[['a1','a2']] = ref_pd[['a1','a2']].apply(lambda row: sorted(list(row)), axis=1).to_list()
+    #ref_pd['chrompos'] = ref_pd.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}/{row['a2']}", axis=1)
 
     #with 1 worker each
     print(f'creating chunks')
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         executor.map(create_chunks, windows)
         executor.shutdown()
-    chunk_glob = glob.glob(chr_dir+f'/chunk_*_*.bim')
+    chunk_glob = glob.glob(chr_dir+f'/chunk_*_*.vcf.gz')
     print(f'expected: {len(windows)}, found: {len(chunk_glob)}')
 
 
@@ -453,6 +439,8 @@ if __name__ == '__main__':
         print(f'expected: {len(windows)}, found: {len(phase_glob)}')
 
 
+    impute_dir = outdir+f'/imputation/{chrom}'
+    Path(impute_dir).mkdir(parents=True, exist_ok=True)
 
     #with multicore workers each
     print(f'impute chunks')
