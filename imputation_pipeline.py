@@ -341,8 +341,6 @@ if __name__ == '__main__':
     # create outfolder
     Path(outdir).mkdir(parents=True, exist_ok=True)
 
-
-
     # calculate intervals for chunks
     posdir = outdir+'/targetpositions'
     Path(posdir).mkdir(parents=True, exist_ok=True)
@@ -357,13 +355,9 @@ if __name__ == '__main__':
     with open(pos) as f:
         positions = [int(line) for line in f.read().splitlines()]
 
-
-
     #qc target data
     qcdir = outdir+'/qc'
     Path(qcdir).mkdir(parents=True, exist_ok=True)
-
-
 
     #extract target chunks
     chr_dir = f'{qcdir}/{chrom}'
@@ -377,10 +371,7 @@ if __name__ == '__main__':
 
     Path(imputdir).mkdir(parents=True, exist_ok=True)
 
-    #update_bim_snpname(refbim)
-    #ref_pd = pd.read_csv(refbim, sep='\s+', header=None, names=['chr', 'snp', 'genetic', 'pos', 'a1', 'a2'])
     ref_pd = get_chrompos_pd_from_vcf(ref)
-    print(ref_pd)
 
     #with 1 worker each
     print(f'creating chunks')
@@ -467,21 +458,9 @@ if __name__ == '__main__':
             print(f'tabix -p vcf {f}')
             subprocess.run(f'tabix -p vcf {f}', shell=True)
 
-    print('orig chunk_vcfs:')
-    print(chunk_vcfs)
-
     chunk_vcfs = pd.DataFrame(chunk_vcfs, columns=['start','file'])
-    print('chunk_vcfs after pd.DataFrame(...):')
-    #print('chunk_vcfs after np.array(chunk_vcfs, dtype=dtype):')
-    print(chunk_vcfs)
-
     chunk_vcfs = chunk_vcfs.sort_values('start')
-    print('chunk_vcfs after df.sort_values(...):')
-    print(chunk_vcfs)
-
     chunk_vcfs = list(chunk_vcfs['file'])
-    print('after list(chunk_vcfs["file"]):')
-    print(chunk_vcfs)
 
     imputchromvcf = f'{imputdir}/{chrom}.dose.vcf.gz'
     imputchrominfo = f'{imputdir}/{chrom}.info.gz'

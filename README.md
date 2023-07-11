@@ -16,7 +16,6 @@ Credit to [Minhui Chen](https://github.com/Minhui-Chen) whose previous work some
   | `--tar` | Prefix for data to be imputed (in PLINK format). |
   | `--ref` | Phased vcf of reference panel. |
   | `--refm3` | Phased m3vcf of reference panel. |
-  | `--refbim` | Path to file format of bim file for reference panel (including '.bim' extension). |
   | `--chrom` | Chromosome to use (e.g. "chr22" for hg38). |
   | `--outdir` | Directory to write create and output to. |
   | `--workers` | Number of simultaneous threads. |
@@ -31,7 +30,7 @@ Credit to [Minhui Chen](https://github.com/Minhui-Chen) whose previous work some
   - If a reference vcf is provided, will phase chunks against the reference
   - After phasing on each chunk, stitches results into one final file
 
- 
+
   | Argument | Description |
   | --- | --- |
   | `--tar` | VCF file to be phased. Chrom format should match ref. chrom format if phasing vs. reference. |
