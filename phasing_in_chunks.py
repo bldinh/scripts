@@ -157,13 +157,14 @@ if __name__ == '__main__':
     # create pos file
     pos = POSDIR+f'/{chrom}.pos.txt'
     temp_pos = pos+'.temp'
-    if os.path.isfile(pos):
-        pass
-    else:
-        #write to temp file and move if completed/successful
-        with open(temp_pos, 'w') as f:
+
+    #write to temp file and move if completed/successful
+    with open(temp_pos, 'w') as f:
+        if tar.endswith('.gz'):
+            subprocess.run(f"zcat {tar} | grep ^[^#] | cut -f2", shell=True, stdout=f)
+        else:
             subprocess.run(f"cat {tar} | grep ^[^#] | cut -f2", shell=True, stdout=f)
-        subprocess.run(f"mv {temp_pos} {pos}", shell=True)
+    subprocess.run(f"mv {temp_pos} {pos}", shell=True)
 
     with open(pos) as f:
         positions = [int(line) for line in f.read().splitlines()]
