@@ -254,7 +254,7 @@ if __name__ == '__main__':
         if os.stat(path).st_size != 0:
             start = int(path.split('/')[-1].split('_')[1])
             chunk_vcfs.append((start, path))
-    dtype = [('start', int), ('file', 'U100')]
+    dtype = [('start', int), ('file', 'U300')]
     chunk_vcfs = np.array(chunk_vcfs, dtype=dtype)
     chunk_vcfs = np.sort(chunk_vcfs, order='start')
     chunk_vcfs = list(chunk_vcfs['file'])
