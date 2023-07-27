@@ -136,7 +136,6 @@ def create_pathdict_by_window(window):
     impute_dir = outdir+f'/imputation/{chrom}'
     d = {}
 
-
     d['chunkprefix'] = chr_dir+f'/chunk_{start}_{stop}'
     d['chunkvcf'] = chr_dir+f'/chunk_{start}_{stop}.vcf.gz'
     d['chrmissing_dir'] = f'{qcdir}/{chrom}_missing'
@@ -161,6 +160,7 @@ def create_pathdict_by_window(window):
 
     d['imputeddosefile'] = impute_dir+f'/chunk_{start}_{stop}.imputed.dose.vcf.gz'
     d['imputedprefix'] = impute_dir+f'/chunk_{start}_{stop}.imputed'
+
     return d
 
 
@@ -195,14 +195,18 @@ def filter_chunks(window):
         print(f'filter_chunks == keep:',window)
         #read bim into df
         lines = [l.split() for l in subprocess.check_output(f"zcat {w_dict['chunkvcf']} | grep ^[^#] | cut -f1-5", shell=True).decode().splitlines()]
+        print(f'finished read chunkvcf into list',window)
         lines = [[l[0], l[1], l[2], sorted([l[3],l[4]])[0], sorted([l[3],l[4]])[1]] for l in lines]
         bim = pd.DataFrame(lines, columns=['chr', 'pos', 'origsnpid','a1', 'a2'])
+        print(f'finished create bim df from list',window)
         bim['pos'] = bim['pos'].astype('Int64')
         bim['snp'] = bim.apply(lambda row: f"{row['chr']},{row['pos']},{row['a1']}{row['a2']}", axis=1)
+        print(f'finished create chrompos col in df',window)
 
         # pick loc of snps only
         bim = bim.loc[(bim['a1'].isin(alleles+['0'])) & (bim['a2'].isin(alleles+['0']))]
         pos = np.array(bim['pos'])
+        print(f'finished subset pos in df',window)
 
         # make sure dis is not negative
         dis = pos[1:] - pos[:-1]
@@ -214,12 +218,15 @@ def filter_chunks(window):
         duplicates = np.append(snp[:-1][dis<=1], snp[1:][dis<=1])
         bim = bim.loc[~bim['snp'].isin(duplicates)]
 
+        print(f'finished remove dup pos in df',window)
 
         # filter missing rate / call rate
         lmissfile = w_dict['chunkmissingprefix']+'.lmiss'
         highmissing = pd.read_csv(lmissfile, sep='\s+')
+        print(f'finished parsing lmissfile',window)
         highmissing = highmissing.loc[highmissing['F_MISS'] > (1-minsnpCallRate)]
         bim = bim.loc[~bim['snp'].isin(highmissing['SNP'])]
+        print(f'finished remove highmissing in df',window)
 
         # extract snps and convert to bcf, then index
         #bim['snp'].to_csv(w_dict['snpsfile'], sep='\t', index=False, header=False)
@@ -227,7 +234,9 @@ def filter_chunks(window):
         print(w_dict['snpsfile'])
         bcftools_cmd = f'bcftools view --include ID==@{w_dict["snpsfile"]} -Ob -o {w_dict["bcf"]} {w_dict["chunkvcf"]}'
         subprocess.call(bcftools_cmd, shell=True)
+        print(f'finished bcftools call',window)
         subprocess.call(f'bcftools index {w_dict["bcf"]}', shell=True)
+        print(f'finished bcftools indexing',window)
     else:
         print(f'filter_chunks != keep: touch {w_dict["bcf"]}',window)
         subprocess.call(f'touch {w_dict["bcf"]} {w_dict["index"]}', shell=True)
