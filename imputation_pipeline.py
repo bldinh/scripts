@@ -602,12 +602,12 @@ if __name__ == '__main__':
 
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -a -d all {chunkstring}', shell=True)
     if os.path.isfile(imputchromvcf) and os.path.getsize(imputchromvcf) > 0:
-        for fp in chunkstring:
+        for fp in chunkstring.split():
             os.remove(fp)
 
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcfED} -a -d all {chunkstringED}', shell=True)
     if os.path.isfile(imputchromvcfED) and os.path.getsize(imputchromvcfED) > 0:
-        for fp in chunkstring:
+        for fp in chunkstring.split():
             os.remove(fp.replace('dose','empiricalDose'))
 
     if os.path.exists(f'{imputchromvcf}.tbi'):
