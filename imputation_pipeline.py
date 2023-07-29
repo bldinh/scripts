@@ -527,13 +527,20 @@ if __name__ == '__main__':
                     new_chunk = chunk.replace(str(cur_stop), str(new_cur_stop))
                     new_chunk_vcfs.append(new_chunk)
                     new_chunkED = new_chunk.replace('dose','empiricalDose')
+
                     subprocess.call(f"bcftools view -r {chrom}:{cur_start}-{new_cur_stop} -Oz -o {new_chunk} {chunk}", shell=True)
+                    if os.path.isfile(new_chunk) and os.path.getsize(new_chunk) > 0:
+                        os.remove(chunk)
+
                     subprocess.call(f"bcftools view -r {chrom}:{cur_start}-{new_cur_stop} -Oz -o {new_chunkED} {chunkED}", shell=True)
+                    if os.path.isfile(new_chunkED) and os.path.getsize(new_chunkED) > 0:
+                        os.remove(chunkED)
 
                     if os.path.exists(f'{new_chunk}.tbi'):
                         os.remove(f'{new_chunk}.tbi')
                     if os.path.exists(f'{new_chunkED}.tbi'):
                         os.remove(f'{new_chunkED}.tbi')
+
                     print(f'tabix -p vcf {new_chunk}')
                     subprocess.check_output(f'tabix -p vcf {new_chunk}', shell=True)
                     print(f'tabix -p vcf {new_chunkED}')
@@ -550,7 +557,12 @@ if __name__ == '__main__':
                     new_next_chunk = next_chunk.replace(str(next_start), str(new_next_start))
                     new_next_chunkED = new_next_chunk.replace('dose','empiricalDose')
                     subprocess.call(f'bcftools view -r {chrom}:{new_next_start}-{next_stop} -Oz -o {new_next_chunk} {next_chunk}', shell=True)
+                    if os.path.isfile(new_next_chunk) and os.path.getsize(new_next_chunk) > 0:
+                        os.remove(next_chunk)
                     subprocess.call(f'bcftools view -r {chrom}:{new_next_start}-{next_stop} -Oz -o {new_next_chunkED} {next_chunkED}', shell=True)
+                    if os.path.isfile(new_next_chunkED) and os.path.getsize(new_next_chunkED) > 0:
+                        os.remove(next_chunkED)
+
                     if os.path.exists(f'{new_next_chunk}.tbi'):
                         os.remove(f'{new_next_chunk}.tbi')
                     if os.path.exists(f'{new_next_chunkED}.tbi'):
@@ -587,8 +599,17 @@ if __name__ == '__main__':
     chunkstring = ' '.join(new_chunk_vcfs)
     chunkstringED = ' '.join([chunk.replace('dose','empiricalDose') for chunk in new_chunk_vcfs])
     print('concatenating chunks')
+
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -a -d all {chunkstring}', shell=True)
+    if os.path.isfile(imputchromvcf) and os.path.getsize(imputchromvcf) > 0:
+        for fp in chunkstring:
+            os.remove(fp)
+
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcfED} -a -d all {chunkstringED}', shell=True)
+    if os.path.isfile(imputchromvcfED) and os.path.getsize(imputchromvcfED) > 0:
+        for fp in chunkstring:
+            os.remove(fp.replace('dose','empiricalDose'))
+
     if os.path.exists(f'{imputchromvcf}.tbi'):
         os.remove(f'{imputchromvcf}.tbi')
     subprocess.run(f'tabix -p vcf {imputchromvcf}', shell=True)
@@ -596,4 +617,5 @@ if __name__ == '__main__':
         os.remove(f'{imputchromvcfED}.tbi')
     subprocess.run(f'tabix -p vcf {imputchromvcfED}', shell=True)
     print('concatenating and tabix done')
+
 
