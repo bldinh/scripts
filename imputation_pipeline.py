@@ -17,6 +17,8 @@ import subprocess
 # Program paths
 #
 
+# This script will also use bcftools and tabix!
+
 PLINK = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/plink'
 EAGLE = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/eagle'
 GMAP = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/genetic_map_hg38_withX.txt.gz'
@@ -95,7 +97,6 @@ def position_windows(pos, size, start=None, stop=None, step=None):
         window_stop = window_start + size
         if window_stop >= stop:
             # last window
-            window_stop = stop
             last = True
         else:
             window_stop -= 1
@@ -607,8 +608,8 @@ if __name__ == '__main__':
 
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcfED} -a -d all {chunkstringED}', shell=True)
     if os.path.isfile(imputchromvcfED) and os.path.getsize(imputchromvcfED) > 0:
-        for fp in chunkstring.split():
-            os.remove(fp.replace('dose','empiricalDose'))
+        for fp in chunkstringED.split():
+            os.remove(fp)
 
     if os.path.exists(f'{imputchromvcf}.tbi'):
         os.remove(f'{imputchromvcf}.tbi')
