@@ -17,7 +17,6 @@ import subprocess
 
 
 EAGLE = '/scratch1/bldinh/programs/eagle'
-GMAP = '/scratch1/bldinh/programs/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz'
 
 
 #
@@ -34,11 +33,13 @@ parser.add_argument('--ref', required=False, help='phased reference vcf', defaul
 parser.add_argument('--chunksize', required=False, help='chunk size in bp', default=25e6)
 parser.add_argument('--overlap', required=False, help='overlap size in bp', default=5e6)
 parser.add_argument('--multicore', required=False, help='number of workers to use when multithreading', default=5)
+parser.add_argument('--gmap', required=False, help='genetic map to run Eagle with', default='/scratch1/bldinh/programs/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz')
 
 args = parser.parse_args()
 tar = args.tar
 OUTDIR = args.outdir
 chrom = args.chrom
+GMAP = args.gmap
 ref = args.ref
 workers = int(args.workers)
 chunksize = int(args.chunksize)
