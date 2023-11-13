@@ -13,7 +13,7 @@ Credit to [Minhui Chen](https://github.com/Minhui-Chen) whose previous work some
 
   | Argument | Description |
   | --- | --- |
-  | `--tar` | Prefix for data to be imputed (in VCF format). |
+  | `--tar` | Path for data to be imputed (needs to be in vcf.gz format and indexed by tabix). |
   | `--ref` | Phased vcf of reference panel. |
   | `--refm3` | Phased m3vcf of reference panel. |
   | `--chrom` | Chromosome to use (e.g. "chr22" for hg38). |
