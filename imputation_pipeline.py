@@ -470,9 +470,9 @@ if __name__ == '__main__':
             if os.stat(f).st_size != 0:
                 start = int(os.path.basename(f).split('_')[1])
                 chunk_vcfs.append((start, f))
-                g.write(f'chunk_{start}_{stop}\tKeep\n')
+                g.write(f'{f}\tKeep\n')
             else:
-                g.write(f'chunk_{start}_{stop}\tSkip\n')
+                g.write(f'{f}\tSkip\n')
 
 
     chunk_vcfs = pd.DataFrame(chunk_vcfs, columns=['start','file'])
