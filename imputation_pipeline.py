@@ -42,7 +42,6 @@ args = parser.parse_args()
 tar = args.tar
 ref = args.ref
 refm3 = args.refm3
-#refbim = args.refbim
 chrom = args.chrom
 outdir = args.outdir
 workers = int(args.workers)
@@ -128,6 +127,7 @@ def create_chunks(window):
     subprocess.call(f'bcftools view -Oz -o {chunkprefix}.vcf.gz -r {chrom}:{start}-{stop} {tar}', shell=True)
     print('finished create_chunks',window)
 
+
 def create_pathdict_by_window(window):
     start, stop = window
 
@@ -169,7 +169,6 @@ def qc_chunks(window):
     w_dict = create_pathdict_by_window(window)
 
     chunk_pd = get_chrompos_pd_from_vcf(w_dict['chunkvcf'])
-    #print(chunk_pd)
     num_valid_variants = ref_pd.loc[ref_pd['snp'].isin(chunk_pd['snp'])].shape[0]
     percent_valid_variants = num_valid_variants/ref_pd.shape[0]
     Path(w_dict['chrmissing_dir']).mkdir(parents=True, exist_ok=True)
@@ -415,9 +414,7 @@ if __name__ == '__main__':
         executor.map(qc_chunks, windows)
         executor.shutdown()
 
-    #TODO write summary file of each window, e.g.:
-    #chunk1_25000000 <TAB> Keep
-    #chunk_20000001_45000000 <TAB> Skipped
+    #write summary file of each window, e.g.:
     chr_summary_file = f'{imputdir}/{chrom}_chunk_summary.txt'
     write_chunk_summary(windows,chr_summary_file)
 
