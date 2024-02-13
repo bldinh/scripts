@@ -28,7 +28,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--tar', required=True, help='target data VCF')
 parser.add_argument('--ref', required=True, help='phased reference VCF')
 parser.add_argument('--refm3', required=True, help='reference m3vcf')
-#parser.add_argument('--refbim', required=True, help='bim')
 parser.add_argument('--chrom', required=True, help='format the same way as hg38 (e.g. "chr22")')
 parser.add_argument('--outdir', required=True, help='without trailing /')
 parser.add_argument('--workers', required=True, help='number of chunks to work on at same time')
@@ -187,6 +186,20 @@ def qc_chunks(window):
     print('finished qc_chunks',window)
 
 
+def write_chunk_summary(w_list,outfile):
+    with open(outfile, 'w') as g:
+        for window in w_list:
+            start,stop = window
+            w_dict = create_pathdict_by_window(window)
+
+            filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
+
+            if filteredchunk== 'Keep':
+                g.write(f'chunk_{start}_{stop}\tKeep\n')
+            else:
+                g.write(f'chunk_{start}_{stop}\tSkip\n')
+
+
 def filter_chunks(window):
     w_dict = create_pathdict_by_window(window)
 
@@ -319,10 +332,10 @@ def impute_chunks(window):
                                     --prefix {w_dict["imputedprefix"]}', shell=True)
             if os.path.exists(f'{w_dict["imputeddosefile"]}.tbi'):
                 os.remove(f'{w_dict["imputeddosefile"]}.tbi')
-            subprocess.call(f'tabix -p vcf {w_dict["imputeddosefile"]}', shell=True, stdout=subprocess.DEVNULL)
+            subprocess.call(f'tabix -f -p vcf {w_dict["imputeddosefile"]}', shell=True, stdout=subprocess.DEVNULL)
             if os.path.exists(f'{w_dict["imputeddosefile"].replace("dose","empiricalDose")}.tbi'):
                 os.remove(f'{w_dict["imputeddosefile"].replace("dose","empiricalDose")}.tbi')
-            subprocess.call(f'tabix -p vcf {w_dict["imputeddosefile"].replace("dose","empiricalDose")}', shell=True, stdout=subprocess.DEVNULL)
+            subprocess.call(f'tabix -f -p vcf {w_dict["imputeddosefile"].replace("dose","empiricalDose")}', shell=True, stdout=subprocess.DEVNULL)
     else:
         cmd = f'touch {w_dict["imputeddosefile"]}'
         print(f'failed "Keep" and start/stop check, running:{cmd}')
@@ -401,6 +414,12 @@ if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         executor.map(qc_chunks, windows)
         executor.shutdown()
+
+    #TODO write summary file of each window, e.g.:
+    #chunk1_25000000 <TAB> Keep
+    #chunk_20000001_45000000 <TAB> Skipped
+    chr_summary_file = f'{imputdir}/{chrom}_chunk_summary.txt'
+    write_chunk_summary(windows,chr_summary_file)
 
     qc_glob = glob.glob(f'{chrfilter_dir}/chunk_*_*.txt')
     print(f'expected: {len(windows)}, found: {len(qc_glob)}')
@@ -498,20 +517,20 @@ if __name__ == '__main__':
                 if os.path.exists(f'{chunkED}.tbi'):
                     os.remove(f'{chunkED}.tbi')
 
-                print(f'tabix -p vcf {chunk}')
-                subprocess.run(f'tabix -p vcf {chunk}', shell=True)
-                print(f'tabix -p vcf {chunkED}')
-                subprocess.run(f'tabix -p vcf {chunkED}', shell=True)
+                print(f'tabix -f -p vcf {chunk}')
+                subprocess.run(f'tabix -f -p vcf {chunk}', shell=True)
+                print(f'tabix -f -p vcf {chunkED}')
+                subprocess.run(f'tabix -f -p vcf {chunkED}', shell=True)
 
                 if os.path.exists(f'{next_chunk}.tbi'):
                     os.remove(f'{next_chunk}.tbi')
                 if os.path.exists(f"{next_chunkED}.tbi"):
                     os.remove(f"{next_chunkED}.tbi")
 
-                print(f'tabix -p vcf {next_chunk}')
-                subprocess.run(f'tabix -p vcf {next_chunk}', shell=True)
-                print(f"tabix -p vcf {next_chunkED}")
-                subprocess.run(f"tabix -p vcf {next_chunkED}", shell=True)
+                print(f'tabix -f -p vcf {next_chunk}')
+                subprocess.run(f'tabix -f -p vcf {next_chunk}', shell=True)
+                print(f"tabix -f -p vcf {next_chunkED}")
+                subprocess.run(f"tabix -f -p vcf {next_chunkED}", shell=True)
 
                 print(chunk)
 
@@ -542,10 +561,10 @@ if __name__ == '__main__':
                     if os.path.exists(f'{new_chunkED}.tbi'):
                         os.remove(f'{new_chunkED}.tbi')
 
-                    print(f'tabix -p vcf {new_chunk}')
-                    subprocess.check_output(f'tabix -p vcf {new_chunk}', shell=True)
-                    print(f'tabix -p vcf {new_chunkED}')
-                    subprocess.check_output(f'tabix -p vcf {new_chunkED}', shell=True)
+                    print(f'tabix -f -p vcf {new_chunk}')
+                    subprocess.check_output(f'tabix -f -p vcf {new_chunk}', shell=True)
+                    print(f'tabix -f -p vcf {new_chunkED}')
+                    subprocess.check_output(f'tabix -f -p vcf {new_chunkED}', shell=True)
                     #chunk_vcfs[idx] = new_chunk
 
                     #write info up to new stop
@@ -568,10 +587,10 @@ if __name__ == '__main__':
                         os.remove(f'{new_next_chunk}.tbi')
                     if os.path.exists(f'{new_next_chunkED}.tbi'):
                         os.remove(f'{new_next_chunkED}.tbi')
-                    print(f'tabix -p vcf {new_next_chunk}')
-                    subprocess.check_output(f'tabix -p vcf {new_next_chunk}', shell=True)
-                    print(f'tabix -p vcf {new_next_chunkED}')
-                    subprocess.check_output(f'tabix -p vcf {new_next_chunkED}', shell=True)
+                    print(f'tabix -f -p vcf {new_next_chunk}')
+                    subprocess.check_output(f'tabix -f -p vcf {new_next_chunk}', shell=True)
+                    print(f'tabix -f -p vcf {new_next_chunkED}')
+                    subprocess.check_output(f'tabix -f -p vcf {new_next_chunkED}', shell=True)
                     chunk_vcfs[idx+1] = new_next_chunk
                 else:
                     #no overlap
@@ -613,10 +632,10 @@ if __name__ == '__main__':
 
     if os.path.exists(f'{imputchromvcf}.tbi'):
         os.remove(f'{imputchromvcf}.tbi')
-    subprocess.run(f'tabix -p vcf {imputchromvcf}', shell=True)
+    subprocess.run(f'tabix -f -p vcf {imputchromvcf}', shell=True)
     if os.path.exists(f'{imputchromvcfED}.tbi'):
         os.remove(f'{imputchromvcfED}.tbi')
-    subprocess.run(f'tabix -p vcf {imputchromvcfED}', shell=True)
+    subprocess.run(f'tabix -f -p vcf {imputchromvcfED}', shell=True)
     print('concatenating and tabix done')
 
 
