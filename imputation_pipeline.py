@@ -185,19 +185,6 @@ def qc_chunks(window):
     print('finished qc_chunks',window)
 
 
-def write_chunk_summary(w_list,outfile):
-    with open(outfile, 'w') as g:
-        for window in w_list:
-            start,stop = window
-            w_dict = create_pathdict_by_window(window)
-
-            filteredchunk = open(w_dict['chrfilterchunk']).read().strip()
-
-            if filteredchunk== 'Keep':
-                g.write(f'chunk_{start}_{stop}\tKeep\n')
-            else:
-                g.write(f'chunk_{start}_{stop}\tSkip\n')
-
 
 def filter_chunks(window):
     w_dict = create_pathdict_by_window(window)
@@ -414,9 +401,6 @@ if __name__ == '__main__':
         executor.map(qc_chunks, windows)
         executor.shutdown()
 
-    #write summary file of each window, e.g.:
-    chr_summary_file = f'{imputdir}/{chrom}_chunk_summary.txt'
-    write_chunk_summary(windows,chr_summary_file)
 
     qc_glob = glob.glob(f'{chrfilter_dir}/chunk_*_*.txt')
     print(f'expected: {len(windows)}, found: {len(qc_glob)}')
@@ -477,11 +461,19 @@ if __name__ == '__main__':
     print('topmed_imputation_aggregate_chunks:')
     print(topmed_imputation_aggregate_chunks)
 
-    for f in topmed_imputation_aggregate_chunks:
-        print(f'parsing input: {f} ({os.stat(f).st_size})')
-        if os.stat(f).st_size != 0:
-            start = int(os.path.basename(f).split('_')[1])
-            chunk_vcfs.append((start, f))
+    #write summary file of each window, e.g.:
+    chr_summary_file = f'{imputdir}/{chrom}_chunk_summary.txt'
+    with open(chr_summary_file, 'w') as g:
+
+        for f in topmed_imputation_aggregate_chunks:
+            print(f'parsing input: {f} ({os.stat(f).st_size})')
+            if os.stat(f).st_size != 0:
+                start = int(os.path.basename(f).split('_')[1])
+                chunk_vcfs.append((start, f))
+                g.write(f'chunk_{start}_{stop}\tKeep\n')
+            else:
+                g.write(f'chunk_{start}_{stop}\tSkip\n')
+
 
     chunk_vcfs = pd.DataFrame(chunk_vcfs, columns=['start','file'])
     chunk_vcfs = chunk_vcfs.sort_values('start')
