@@ -112,7 +112,7 @@ def position_windows(pos, size, start=None, stop=None, step=None):
     windows = []
 
     #TODO check for empty or near-empty windows
-    shift_size_for_empty_region = 5000000
+    shift_size_for_empty_region = int(0.2*step)
     window_start = start
     window_stop = start + size - 1
     while (window_stop < stop):
