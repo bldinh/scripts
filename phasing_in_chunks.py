@@ -234,7 +234,7 @@ if __name__ == '__main__':
         executor.map(create_chunks_and_idx, windows)
         executor.shutdown()
     chunk_glob = glob.glob(CHRDIR+f'/chunk_*_*.bcf')
-    append_log(log,f'expected: {len(windows)}, found: {len(chunk_glob)}')
+    append_log(log,f'expected: {len(windows)}, found: {len(chunk_glob)}\n')
     assert len(windows) == len(chunk_glob), 'num. of chunks (%s) does not match expected num. (%s)' % (len(chunk_glob), len(windows))
 
 
@@ -248,7 +248,7 @@ if __name__ == '__main__':
         executor.map(phase_chunks, windows)
         executor.shutdown()
     phase_glob = glob.glob(CHRDIR+f'/chunk_*_*.phased.vcf.gz')
-    append_log(log,f'expected: {len(windows)}, found: {len(phase_glob)}')
+    append_log(log,f'expected: {len(windows)}, found: {len(phase_glob)}\n')
     assert len(windows) == len(phase_glob), 'num. phased chunks (%s) does not match expected num. (%s) ' % (len(phase_glob), len(windows))
 
 
@@ -282,7 +282,7 @@ if __name__ == '__main__':
         executor.map(resize_chunks, zip(windows, new_windows))
         executor.shutdown()
     resized_glob = glob.glob(CHRDIR+f'/chunk_*_*.phased.resizeBin.vcf.gz')
-    append_log(log,f'expected: {len(new_windows)}, found: {len(resized_glob)}')
+    append_log(log,f'expected: {len(new_windows)}, found: {len(resized_glob)}\n')
     assert len(new_windows) == len(resized_glob), 'num. of chunks (%s) does not match expected num. (%s)' % (len(resized_glob), len(new_windows))
 
 
@@ -291,7 +291,7 @@ if __name__ == '__main__':
     outchunks = f'{PHASEDIR}/{chrom}.phased.vcf.chunks'
     chunk_vcfs = []
     for path in aggregate_phased_chunks:
-        append_log(log,f'parsing input: {path} ({os.stat(path).st_size})')
+        append_log(log,f'parsing input: {path} ({os.stat(path).st_size})\n')
         if os.stat(path).st_size != 0:
             start = int(path.split('/')[-1].split('_')[1])
             chunk_vcfs.append((start, path))
@@ -300,14 +300,14 @@ if __name__ == '__main__':
     chunk_vcfs = np.sort(chunk_vcfs, order='start')
     chunk_vcfs = list(chunk_vcfs['file'])
     for chunk in chunk_vcfs:
-        append_log(log,f'{chunk}')
+        append_log(log,f'{chunk}\n')
 
 
     # write chunks to file
-    append_log(log,f'writing to {outchunks}')
+    append_log(log,f'writing to {outchunks}\n')
     with open(outchunks, 'w') as f:
         f.write('\n'.join(chunk_vcfs))
-    append_log(log,f'finished writing')
+    append_log(log,f'finished writing\n')
 
 
     # combine phased chunks
