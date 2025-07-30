@@ -540,8 +540,7 @@ if __name__ == '__main__':
     if len(chunk_vcfs) > 0:
         chunk_infos = [chunk.replace('dose.vcf.gz','info') for chunk in chunk_vcfs]
 
-        #with gzip.open(imputchrominfo, 'wt') as g:
-        with gzip.open(imputchrominfo+'dummy', 'wt') as g:
+        with gzip.open(imputchrominfo, 'wt') as g:
             #write info header
             g.write('SNP	REF(0)	ALT(1)	ALT_Frq	MAF	AvgCall	Rsq	Genotyped	LooRsq	EmpR	EmpRsq	Dose0	Dose1\n')
             while idx < len(chunk_vcfs)-1:
