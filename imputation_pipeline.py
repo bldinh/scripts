@@ -74,6 +74,8 @@ alleles = ['A', 'T', 'C', 'G']
 minsnpCallRate = 0.9
 min_maf = 1e-10 # remove monomorphic snps
 buffersize = 2.5e6
+min_window_offset = 1000000  #shift 1Mb at the beginning of chr
+
 
 # Write/overwite log for run
 log = f'{outdir}/{chrom}.log.txt'
@@ -111,15 +113,13 @@ def position_windows(pos, size, start=None, stop=None, step=None):
         step = size
     windows = []
 
-    shift_size_for_empty_region = int(0.2*step)
     window_start = start
     window_stop = start + size - 1
     while (window_start < stop):
-
         snps_in_beginning = False
 
         #check positions in front portion
-        snps = [x for x in pos if window_start <= x <= window_start + shift_size_for_empty_region - 1]
+        snps = [x for x in pos if window_start <= x <= window_start + min_window_offset - 1]
         if len(snps) > 0:
             snps_in_beginning = True
 
@@ -130,8 +130,9 @@ def position_windows(pos, size, start=None, stop=None, step=None):
             window_stop += step
         else:
             #shift window
-            window_start += shift_size_for_empty_region
-            window_stop += shift_size_for_empty_region
+            append_log(log, f'no snps detected from {window_start}-{window_start+min_window_offset-1} - shifted window {min_window_offset}\n')
+            window_start += min_window_offset
+            window_stop += min_window_offset
 
     return np.asarray(windows)
 
@@ -410,8 +411,7 @@ if __name__ == '__main__':
         shutil.rmtree(chr_dir)
     Path(chr_dir).mkdir(parents=True, exist_ok=True)
 
-    #Take first position and get closest 5Mb + 1 (e.g. 1, 5000001, 10000001, 15000001, etc.)
-    min_window_offset = 5000000
+    #Take first position and get closest 1Mb + 1 (e.g. 1, 1000001, 2000001, 3000001, etc.)
     startfloor = positions[0]//min_window_offset
     startpos = startfloor*min_window_offset + 1
     windows = position_windows(pos=np.array(positions), size=int(chunksize), start=startpos, step=int(chunksize-overlap))
