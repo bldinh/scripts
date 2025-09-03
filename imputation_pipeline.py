@@ -134,6 +134,10 @@ def position_windows(pos, size, start=None, stop=None, step=None):
             window_start += min_window_offset
             window_stop += min_window_offset
 
+        remaining_snps = [x for x in pos if window_stop < x]
+        if len(remaining_snps) == 0:
+            break
+
     return np.asarray(windows)
 
 
@@ -337,7 +341,7 @@ def impute_chunks(window):
             append_log(log,f'empty impute region, running:{cmd}\n')
             result = subprocess.call(cmd, shell=True)
         else:
-            result1 = subprocess.call(f'{MM4} --refHaps {refm3} \
+            cmd = f'{MM4} --refHaps {refm3} \
                                     --haps {preimputationvcf} --chr {chrom} \
                                     --start {start} \
                                     --end {stop} \
@@ -348,7 +352,9 @@ def impute_chunks(window):
                                     --meta \
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
-                                    --prefix {w_dict["imputedprefix"]}', shell=True)
+                                    --prefix {w_dict["imputedprefix"]}'
+            append_log(log,f'IMPUTING CHUNK:{cmd}\n')
+            result1 = subprocess.call(cmd, shell=True)
             if os.path.exists(f'{w_dict["imputeddosefile"]}.tbi'):
                 os.remove(f'{w_dict["imputeddosefile"]}.tbi')
             result2 = subprocess.call(f'tabix -f -p vcf {w_dict["imputeddosefile"]}', shell=True, stdout=subprocess.DEVNULL)
@@ -555,7 +561,7 @@ if __name__ == '__main__':
                 cur_stop = int(os.path.basename(chunk).split('_')[2].split('.')[0])
                 next_start = int(os.path.basename(next_chunk).split('_')[1])
                 next_stop = int(os.path.basename(next_chunk).split('_')[2].split('.')[0])
-                append_log(log,f'current int: ({cur_start}, {cur_stop}), next int: ({next_start}, {next_stop})')
+                append_log(log,f'current int: ({cur_start}, {cur_stop}), next int: ({next_start}, {next_stop})\n')
 
                 if os.path.exists(f'{chunk}.tbi'):
                     os.remove(f'{chunk}.tbi')
@@ -576,22 +582,22 @@ if __name__ == '__main__':
 
                 if next_start < cur_stop:
                     #overlap!
-                    append_log(log,f'overlap found: {cur_stop} < {next_start}')
+                    append_log(log,f'overlap found: {cur_stop} < {next_start}\n')
 
                     #change cur stop to new pos and extract vcf, update to new path
                     new_cur_stop = cur_stop - int(overlap/2)
                     new_chunk = chunk.replace(str(cur_stop), str(new_cur_stop))
                     new_chunk_vcfs.append(new_chunk)
                     new_chunkED = new_chunk.replace('dose','empiricalDose')
-                    append_log(log,f'updated current int: ({cur_start}, {new_cur_stop}), trimming...')
+                    append_log(log,f'updated current int: ({cur_start}, {new_cur_stop}), trimming...\n')
 
                     subprocess.call(f"bcftools view -r {chrom}:{cur_start}-{new_cur_stop} -Oz -o {new_chunk} {chunk}", shell=True)
-                    if os.path.isfile(new_chunk) and os.path.getsize(new_chunk) > 0:
-                        os.remove(chunk)
+                    #if os.path.isfile(new_chunk) and os.path.getsize(new_chunk) > 0:
+                    #    os.remove(chunk)
 
                     subprocess.call(f"bcftools view -r {chrom}:{cur_start}-{new_cur_stop} -Oz -o {new_chunkED} {chunkED}", shell=True)
-                    if os.path.isfile(new_chunkED) and os.path.getsize(new_chunkED) > 0:
-                        os.remove(chunkED)
+                    #if os.path.isfile(new_chunkED) and os.path.getsize(new_chunkED) > 0:
+                    #    os.remove(chunkED)
 
                     if os.path.exists(f'{new_chunk}.tbi'):
                         os.remove(f'{new_chunk}.tbi')
@@ -603,7 +609,7 @@ if __name__ == '__main__':
                     ##chunk_vcfs[idx] = new_chunk
 
                     #write info up to new stop
-                    append_log(log,f'parsing info ({info}) for lines between {cur_start} and {new_cur_stop}')
+                    append_log(log,f'parsing info ({info}) for lines between {cur_start} and {new_cur_stop}\n')
                     valid_info_lines = parse_info_between_pos(info, cur_start, new_cur_stop)
                     for line in valid_info_lines:
                         g.write(f'{line}\n')
@@ -612,14 +618,14 @@ if __name__ == '__main__':
                     new_next_start = next_start + int(overlap/2)
                     new_next_chunk = next_chunk.replace(str(next_start), str(new_next_start))
                     new_next_chunkED = new_next_chunk.replace('dose','empiricalDose')
-                    append_log(log,f'updated next int: ({new_next_start}, {next_stop}), trimming...')
+                    append_log(log,f'updated next int: ({new_next_start}, {next_stop}), trimming...\n')
 
                     subprocess.call(f'bcftools view -r {chrom}:{new_next_start}-{next_stop} -Oz -o {new_next_chunk} {next_chunk}', shell=True)
-                    if os.path.isfile(new_next_chunk) and os.path.getsize(new_next_chunk) > 0:
-                        os.remove(next_chunk)
+                    #if os.path.isfile(new_next_chunk) and os.path.getsize(new_next_chunk) > 0:
+                    #    os.remove(next_chunk)
                     subprocess.call(f'bcftools view -r {chrom}:{new_next_start}-{next_stop} -Oz -o {new_next_chunkED} {next_chunkED}', shell=True)
-                    if os.path.isfile(new_next_chunkED) and os.path.getsize(new_next_chunkED) > 0:
-                        os.remove(next_chunkED)
+                    #if os.path.isfile(new_next_chunkED) and os.path.getsize(new_next_chunkED) > 0:
+                    #    os.remove(next_chunkED)
 
                     if os.path.exists(f'{new_next_chunk}.tbi'):
                         os.remove(f'{new_next_chunk}.tbi')
@@ -627,11 +633,11 @@ if __name__ == '__main__':
                         os.remove(f'{new_next_chunkED}.tbi')
                     subprocess.check_output(f'tabix -f -p vcf {new_next_chunk}', shell=True)
                     subprocess.check_output(f'tabix -f -p vcf {new_next_chunkED}', shell=True)
-                    append_log(log,f'setting next index chunk to {new_next_chunk}')
+                    append_log(log,f'setting next index chunk to {new_next_chunk}\n')
                     chunk_vcfs[idx+1] = new_next_chunk
                 else:
                     #no overlap
-                    append_log(log,f'no overlap with next chunk, writing all info lines')
+                    append_log(log,f'no overlap with next chunk, writing all info lines\n')
                     #can write full info for current chunk
                     with open(info) as f:
                         lines = [rline.strip() for rline in f.read().splitlines()[1:]]
@@ -639,37 +645,37 @@ if __name__ == '__main__':
                         g.write(f'{line}\n')
                 idx += 1
             if idx == len(chunk_vcfs)-1:
-                append_log(log,f'last chunk: {chunk}')
+                append_log(log,f'last chunk: {chunk}\n')
                 chunk = chunk_vcfs[idx]
                 new_chunk_vcfs.append(chunk)
                 info = chunk_infos[idx]
                 cur_start = int(os.path.basename(chunk).split('_')[1])
                 cur_stop = int(os.path.basename(chunk).split('_')[2].split('.')[0])
 
-                append_log(log,f'writing info lines between {cur_start} and {cur_stop}')
+                append_log(log,f'writing info lines between {cur_start} and {cur_stop}\n')
                 valid_info_lines = parse_info_between_pos(info, cur_start, cur_stop)
                 for line in valid_info_lines:
                     g.write(f'{line}\n')
 
     outchunks = f'{imputdir}/{chrom}.imputed.dose.vcf.chunks'
-    append_log(log,f'writing to {outchunks}')
+    append_log(log,f'writing to {outchunks}\n')
     with open(outchunks, 'w') as f:
         f.write('\n'.join(new_chunk_vcfs))
-    append_log(log,f'writing done')
+    append_log(log,f'writing done\n')
 
     chunkstring = ' '.join(new_chunk_vcfs)
     chunkstringED = ' '.join([chunk.replace('dose','empiricalDose') for chunk in new_chunk_vcfs])
-    append_log(log,'concatenating chunks')
+    append_log(log,'concatenating chunks\n')
 
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcf} -a -d all {chunkstring}', shell=True)
-    if os.path.isfile(imputchromvcf) and os.path.getsize(imputchromvcf) > 0:
-        for fp in chunkstring.split():
-            os.remove(fp)
+    #if os.path.isfile(imputchromvcf) and os.path.getsize(imputchromvcf) > 0:
+    #    for fp in chunkstring.split():
+    #        os.remove(fp)
 
     subprocess.call(f'bcftools concat --threads {workers} -Oz -o {imputchromvcfED} -a -d all {chunkstringED}', shell=True)
-    if os.path.isfile(imputchromvcfED) and os.path.getsize(imputchromvcfED) > 0:
-        for fp in chunkstringED.split():
-            os.remove(fp)
+    #if os.path.isfile(imputchromvcfED) and os.path.getsize(imputchromvcfED) > 0:
+    #    for fp in chunkstringED.split():
+    #        os.remove(fp)
 
     if os.path.exists(f'{imputchromvcf}.tbi'):
         os.remove(f'{imputchromvcf}.tbi')
@@ -677,10 +683,10 @@ if __name__ == '__main__':
     if os.path.exists(f'{imputchromvcfED}.tbi'):
         os.remove(f'{imputchromvcfED}.tbi')
     subprocess.run(f'tabix -p vcf {imputchromvcfED}', shell=True)
-    append_log(log,'concatenating and tabix done')
+    append_log(log,'concatenating and tabix done\n')
 
     output = subprocess.check_output(f'bcftools index -n {imputchromvcf}', shell=True)
-    append_log(log,f'number of snps in dosage file: {output}')
+    append_log(log,f'number of snps in dosage file: {output}\n')
 
 
 
