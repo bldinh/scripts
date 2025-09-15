@@ -310,7 +310,7 @@ def phase_chunks(window):
                                   --allowRefAltSwap \
                                   --vcfOutFormat z'
 
-        append_log(log,f'PHASING CHUNK {window}:\n{'    \n'.join(cmd.split())}\n')
+        append_log(log,f'PHASING CHUNK {window}:\n{"    \n".join(cmd.split())}\n')
         result = subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:
         result = subprocess.call(f'touch {w_dict["phasedvcf"]}', shell=True)
@@ -366,7 +366,7 @@ def impute_chunks(window):
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
                                     --prefix {w_dict["imputedprefix"]}'
-            append_log(log,f'IMPUTING CHUNK {window}:\n{'    \n'.join(cmd.split())}\n')
+            append_log(log,f'IMPUTING CHUNK {window}:\n{"    \n".join(cmd.split())}\n')
             result1 = subprocess.call(cmd, shell=True)
             if os.path.exists(f'{w_dict["imputeddosefile"]}.tbi'):
                 os.remove(f'{w_dict["imputeddosefile"]}.tbi')
