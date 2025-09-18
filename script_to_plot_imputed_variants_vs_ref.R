@@ -21,8 +21,8 @@ max_mb <- (last_pos %/% 1000000) + 1
 
 pdf(argv$out)
 
-p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.5), main=argv$prefix)
-p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(1,0.5,0,.5), add=T)
+p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.75), main=argv$prefix)
+p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(1,0.5,0,.75), add=T)
 
 legend("bottomleft", inset=.02, legend=c('ref', 'tar'), fill=c('red','orange'), cex=0.8)
 
