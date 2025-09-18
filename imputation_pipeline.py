@@ -139,7 +139,6 @@ def position_windows(pos, size, start=None, stop=None, step=None):
 
     while (window_start < final_start):
         snps_in_beginning = False
-
         num_snps_in_first_section = [x for x in pos if window_start <= x <= window_start + min_window_offset - 1]
         if len(num_snps_in_first_section) > 0:
             snps_in_beginning = True
@@ -155,8 +154,8 @@ def position_windows(pos, size, start=None, stop=None, step=None):
             window_start += min_window_offset
             window_stop += min_window_offset
 
-        remaining_snps = [x for x in pos if window_stop < x < final_start]
-        if len(remaining_snps) == 0:
+        #early stop condition to avoid 2nd-to-last chunk highly overlapping last chunk
+        if final_start - window_start < overlap:
             break
 
     windows.append([final_start, final_stop])
