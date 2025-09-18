@@ -112,11 +112,12 @@ def append_log(fp,string):
 
 def position_windows(pos, size, start=None, stop=None, step=None):
     """
-    Break up variants into windows from pos
+    Break up variants into windows from list of basepair positions
     Window is shifted if no variants are found in the beginning of the window
-    Added 'final' chunk that has snps spanning entire interval
-        updated trimming logic to calculate midpoint of each chunk on-the-fly
-        chunk is expected to impute better where variants don't span entire window
+    Added 'final' chunk that has snps spanning entire interval:
+        chunk is expected to impute better when variants didn't span entire window
+        trimming logic in process_chunk_windows_to_final_trim_windows now accounts for varying overlap sizes
+        chunks that start within the "overlap" size of final chunk are dropped
     """
 
     #final chunk
