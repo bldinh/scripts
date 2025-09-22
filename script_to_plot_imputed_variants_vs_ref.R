@@ -12,19 +12,25 @@ parser <- add_argument(parser,"--prefix", help="plot title")
 
 argv <- parse_args(parser)
 
-ref_pos <- read.csv(argv$ref, header=F, sep='\t')
-tar_pos <- read.csv(argv$tar, header=F, sep='\t')
+ref_fp <- argv$ref
+tar_fp <- argv$tar
+prefix <- argv$prefix
+
+ref_pos <- read.csv(ref_fp, header=F, sep='\t')
+tar_pos <- read.csv(tar_fp, header=F, sep='\t')
 
 last_pos <- max(ref_pos$V1,tar_pos$V1)
 max_mb <- (last_pos %/% 1000000) + 1
-#hist_breaks <- c(1,c(1:max_mb)*1000000)
 
 pdf(argv$out)
 
-p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.75), main=argv$prefix)
-p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(1,0.5,0,.75), add=T)
+p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.75), main=paste(prefix, '(', length(ref_pos$V1)-length(tar_pos$V1), 'variants lost)'))
+p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(0,0,1,.25), add=T)
 
-legend("bottomleft", inset=.02, legend=c('ref', 'tar'), fill=c('red','orange'), cex=0.8)
+ref_title <- paste('ref (', length(ref_pos$V1), 'variants )')
+tar_title <- paste('tar (', length(tar_pos$V1), 'variants )')
+
+legend("bottomleft", inset=.02, legend=c(ref_title, tar_title), fill=c('red','blue'), cex=0.8)
 
 dev.off()
 
