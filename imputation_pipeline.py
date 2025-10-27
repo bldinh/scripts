@@ -27,7 +27,7 @@ PLINK = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/progra
 EAGLE = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/eagle'
 GMAP = '/project/haiman_625/Software/imputation_pipeline_CharlestonGroup/programs/genetic_map_hg38_withX.txt.gz'
 MM4 = '/project/chia657_28/programs/minimac4/bin/minimac4'
-HIST_R_SCRIPT = 'script_to_plot_imputed_variants_vs_ref.R'
+HIST_R_SCRIPT = '/project/minhuic_62/bldinh/induproject_bldinh/newscratch2/github/scripts/script_to_plot_imputed_variants_vs_ref.R'
 
 
 parser = argparse.ArgumentParser()
@@ -310,7 +310,7 @@ def phase_chunks(window):
                                   --allowRefAltSwap \
                                   --vcfOutFormat z'
 
-        cmd_for_log = "    \n".join(cmd.split())
+        cmd_for_log = "\n    ".join(cmd.split())
         append_log(log,f'PHASING CHUNK {window}:\n{cmd_for_log}\n')
         result = subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:
@@ -367,7 +367,7 @@ def impute_chunks(window):
                                     --noPhoneHome \
                                     --minRatio 0.00001 \
                                     --prefix {w_dict["imputedprefix"]}'
-            cmd_for_log = "    \n".join(cmd.split())
+            cmd_for_log = "\n    ".join(cmd.split())
             append_log(log,f'IMPUTING CHUNK {window}:\n{cmd_for_log}\n')
             result1 = subprocess.call(cmd, shell=True)
             if os.path.exists(f'{w_dict["imputeddosefile"]}.tbi'):
@@ -552,7 +552,8 @@ if __name__ == '__main__':
     #Create imputedir
     append_log(log,f'reading positions from ref: {ref}\n')
     ref_pd, ref_pos = get_chrompos_pd_from_vcf(ref)
-    with open(f'{outdir}/{chrom}.ref.pos.txt', 'w') as g:
+    ref_pos_fp = f'{outdir}/{chrom}.ref.pos.txt'
+    with open(ref_pos_fp, 'w') as g:
         for pos in ref_pos:
             g.write(f'{pos}\n')
 
@@ -717,9 +718,13 @@ if __name__ == '__main__':
         tar_pos_fp = f'{outdir}/{chrom}.tar.pos.txt'
         append_log(log,f'Writing target pos to {tar_pos_fp}\n')
         write_vcf_pos_to_file(imputchromvcf, tar_pos_fp)
+
+        tar_miss_pos_fp = f'{outdir}/{chrom}.tar.pos.not.found.txt'
+        cmd = f'comm -23 <(sort {ref_pos_fp}) <(sort {tar_pos_fp}) | sort -nk1,1 > {tar_miss_pos_fp}'
+
         append_log(log,f'Plotting target vs ref histogram\n')
-        subprocess.call(f'Rscript {HIST_R_SCRIPT} --ref {outdir}/{chrom}.ref.pos.txt \
-                                                  --tar {outdir}/{chrom}.tar.pos.txt \
+        subprocess.call(f'Rscript {HIST_R_SCRIPT} --ref {ref_pos_fp} \
+                                                  --tar {tar_pos_fp} \
                                                   --out {outdir}/{chrom}.tar.vs.ref.hist.pdf \
                                                   --prefix "{chrom} tar vs. ref"', shell=True)
 

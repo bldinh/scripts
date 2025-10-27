@@ -9,6 +9,9 @@ import subprocess
 
 
 # based on implementation of the TOPMed pipeline by Minhui Chen
+# TODO
+    #update folder organization
+    #update window trimming to match imputation pipeline
 
 
 #
@@ -17,6 +20,7 @@ import subprocess
 
 
 EAGLE = '/project/chia657_28/programs/Eagle_v2.4.1/eagle'
+HIST_R_SCRIPT = '/project/minhuic_62/bldinh/induproject_bldinh/newscratch2/github/scripts/script_to_plot_imputed_variants_vs_ref.R'
 
 
 #
@@ -34,6 +38,7 @@ parser.add_argument('--chunksize', required=False, help='chunk size in bp', defa
 parser.add_argument('--overlap', required=False, help='overlap size in bp', default=5e6)
 parser.add_argument('--multicore', required=False, help='number of workers to use when multithreading', default=5)
 parser.add_argument('--gmap', required=False, help='genetic map to run Eagle with', default='/project/chia657_28/programs/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz')
+parser.add_argument('--noplot', default=False, action='store_true', help='Skip plotting of histogram of variants before and after phasing.')
 
 args = parser.parse_args()
 tar = args.tar
@@ -45,6 +50,7 @@ workers = int(args.workers)
 chunksize = int(args.chunksize)
 overlap = int(args.overlap)
 multicore = int(args.multicore)
+skiphistplot = not args.noplot
 max_multithread = max(1,int(workers/multicore))
 
 log = f'{OUTDIR}/{chrom}.log.txt'
@@ -316,5 +322,18 @@ if __name__ == '__main__':
 
     if os.path.isfile(phasedchromfile):
         shutil.rmtree(CHRDIR)
+
+    #TODO: update
+    if not skiphistplot:
+        tar_pos_fp = f'{OUTDIR}/{chrom}.tar.phased.pos.txt'
+        append_log(log,f'Writing target pos to {tar_pos_fp}\n')
+        #write_vcf_pos_to_file(imputchromvcf, tar_pos_fp)
+        cmd = f"zcat {phasedchromfile} | grep ^[^#] | cut -f2 > {tar_pos_fp}"
+        result1 = subprocess.call(cmd, shell=True)
+        append_log(log,f'Plotting target vs ref histogram\n')
+        subprocess.call(f'Rscript {HIST_R_SCRIPT} --ref {pos} \
+                                                  --tar {tar_pos_fp} \
+                                                  --out {OUTDIR}/{chrom}.before.and.after.phasing.hist.pdf \
+                                                  --prefix "{chrom} before and after phasing"', shell=True)
 
 

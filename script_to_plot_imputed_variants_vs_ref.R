@@ -4,7 +4,6 @@ options(scipen=10000)
 bg="white"
 
 parser <- arg_parser("")
-
 parser <- add_argument(parser,"--ref", help="the reference chr pos file")
 parser <- add_argument(parser,"--tar", help="the target chr pos file")
 parser <- add_argument(parser,"--out", help="output filename")
@@ -30,7 +29,7 @@ p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(0,0,1,.25), add=T)
 ref_title <- paste('ref (', length(ref_pos$V1), 'variants )')
 tar_title <- paste('tar (', length(tar_pos$V1), 'variants )')
 
-legend("bottomleft", inset=.02, legend=c(ref_title, tar_title), fill=c('red','blue'), cex=0.8)
+legend("bottomleft", inset=.02, legend=c(ref_title, tar_title), fill=c('red','blue'), cex=0.8, bg="white")
 
 dev.off()
 
