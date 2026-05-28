@@ -23,8 +23,8 @@ max_mb <- (last_pos %/% 1000000) + 1
 
 pdf(argv$out)
 
-p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.75), main=paste(prefix, '(', length(ref_pos$V1)-length(tar_pos$V1), 'variants lost)'))
-p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(0,0,1,.25), add=T)
+p1 <- hist(ref_pos$V1, breaks=max_mb, col=rgb(1,0,0,.75), main=paste(prefix, '(', length(ref_pos$V1)-length(tar_pos$V1), 'variants lost)'), border = NA, alpha = 0.5)
+p2 <- hist(tar_pos$V1, breaks=max_mb, col=rgb(0,0,1,.25), add=T, border = F, alpha = 0.5)
 
 ref_title <- paste('ref (', length(ref_pos$V1), 'variants )')
 tar_title <- paste('tar (', length(tar_pos$V1), 'variants )')

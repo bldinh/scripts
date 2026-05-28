@@ -33,9 +33,10 @@ outputdir=vanillaeGRMwithPCs
 #if column names differ, they can be provided to the first script
 #default filtering is at MAF >= 0.005, MAC >= 10, Rsq >= 0.3
 
-new_assoc=/project2/chia657_28/users/bldinh/summarystats/assoc_test_on_bmi_asegrm_4km/bmi/assoc/association_pd_higham_shift.20pcs.chr%s.addRsq.addAF.txt
-new_assoc=/project2/chia657_28/users/bldinh/summarystats/assoc_test_on_phenos_topmed_r3_eGRMwithPCs/bmi/assoc/nullmodel.20pcs.chr%s.addRsq.addAF.txt
-base_assoc=/project2/chia657_28/resources/GWAS_SummaryStats/private/NH_Samoa_TOPMedImputed/assoc_test_on_phenos_topmed_r3_vanilla/bmi/assoc/nullmodel.20pcs.chr%s.addRsq.addAF.txt
+#if all phenotypes are in the same directory, the paths below can use arrays to run multiple phenotypes at once
+
+new_assoc=/path/to/assoc/sum/stats/chr%s.addRsq.addAF.txt
+base_assoc=/path/to/baseline/assoc/sum/stats/chr%s.addRsq.addAF.txt
 
 
 python3 _1_calc_col_enrich_from_sumstat.py --pheno $pheno \
