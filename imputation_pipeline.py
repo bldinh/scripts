@@ -721,7 +721,7 @@ if __name__ == '__main__':
 
         tar_miss_pos_fp = f'{outdir}/{chrom}.tar.pos.not.found.txt'
         cmd = f'comm -23 <(sort {ref_pos_fp}) <(sort {tar_pos_fp}) | sort -nk1,1 > {tar_miss_pos_fp}'
-        subprocess.call(cmd, shell=True)
+        subprocess.call(cmd, shell=True, executable="/bin/bash")
 
         append_log(log,f'Plotting target vs ref histogram\n')
         subprocess.call(f'Rscript {HIST_R_SCRIPT} --ref {ref_pos_fp} \
